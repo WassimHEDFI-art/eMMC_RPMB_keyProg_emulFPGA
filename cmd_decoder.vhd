@@ -71,7 +71,7 @@ begin
             cmd_out_reg <= '1';
             if cmd_in = '0' then
               rx_shift <= (others => '0');
-              rx_shift(47) <= cmd_in;
+              rx_shift(0) <= cmd_in;
               rx_bit_cnt <= 1;
               state <= CMD_RX;
             end if;
