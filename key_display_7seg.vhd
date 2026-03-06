@@ -23,6 +23,7 @@ architecture rtl of key_display_7seg is
   constant C_TOTAL_NIBBLES : integer := 64;
   constant C_PAGE_WIDTH    : integer := 6;
   constant C_LAST_PAGE     : integer := 10; -- ceil(64/6)-1
+  constant C_GREETING_TICKS: natural := 150_000_000; -- 3 s @ 50 MHz
 
   signal key_latched        : std_logic_vector(255 downto 0) := (others => '0');
   signal key_programmed_d   : std_logic := '0';
@@ -37,6 +38,9 @@ architecture rtl of key_display_7seg is
 
   signal next_pulse         : std_logic := '0';
   signal restart_pulse      : std_logic := '0';
+
+  signal greeting_active    : std_logic := '1';
+  signal greeting_count     : natural range 0 to C_GREETING_TICKS := 0;
 
   function nibble_to_7seg(n : std_logic_vector(3 downto 0)) return std_logic_vector is
   begin
@@ -91,6 +95,20 @@ architecture rtl of key_display_7seg is
 
     return nibble_to_7seg(key_nibble(key, idx));
   end function;
+
+  function greeting_segs(pos : integer) return std_logic_vector is
+  begin
+    -- Active-low segments, order: g f e d c b a
+    -- Shows HELLO! on HEX5..HEX0 (left to right).
+    case pos is
+      when 0 => return "0001001"; -- H
+      when 1 => return "0000110"; -- E
+      when 2 => return "1000111"; -- L
+      when 3 => return "1000111"; -- L
+      when 4 => return "1000000"; -- O
+      when others => return "1111001"; -- ! (approximated using '1')
+    end case;
+  end function;
 begin
   process (clk)
   begin
@@ -104,6 +122,8 @@ begin
         btn_next_ff1     <= '0';
         btn_restart_ff0  <= '0';
         btn_restart_ff1  <= '0';
+        greeting_active  <= '1';
+        greeting_count   <= 0;
       else
         key_programmed_d <= key_programmed;
 
@@ -112,29 +132,47 @@ begin
         btn_restart_ff0 <= btn_restart;
         btn_restart_ff1 <= btn_restart_ff0;
 
-        if key_programmed = '0' then
-          -- Display must remain disabled until key is programmed.
-          show_active <= '0';
-          page_index  <= 0;
-        else
-          -- Auto-start display when key gets programmed.
-          if (key_programmed_d = '0') and (key_programmed = '1') then
-            key_latched <= key_value;
-            page_index  <= 0;
-            show_active <= '1';
-          end if;
-
-          -- Restart from beginning (only meaningful once key exists).
+        if greeting_active = '1' then
           if restart_pulse = '1' then
-            key_latched <= key_value;
+            greeting_active <= '0';
+            greeting_count  <= 0;
+            show_active     <= '0';
+            page_index      <= 0;
+          elsif greeting_count = C_GREETING_TICKS - 1 then
+            greeting_active <= '0';
+            greeting_count  <= 0;
+            show_active     <= '0';
+            page_index      <= 0;
+          else
+            greeting_count <= greeting_count + 1;
+          end if;
+        else
+          greeting_count <= 0;
+
+          if key_programmed = '0' then
+            -- Display must remain disabled until key is programmed.
+            show_active <= '0';
             page_index  <= 0;
-            show_active <= '1';
-          elsif next_pulse = '1' and show_active = '1' then
-            if page_index = C_LAST_PAGE then
-              -- End of key display: turn all HEX off until restart button.
-              show_active <= '0';
-            else
-              page_index <= page_index + 1;
+          else
+            -- Auto-start display when key gets programmed.
+            if (key_programmed_d = '0') and (key_programmed = '1') then
+              key_latched <= key_value;
+              page_index  <= 0;
+              show_active <= '1';
+            end if;
+
+            -- Restart from beginning (only meaningful once key exists).
+            if restart_pulse = '1' then
+              key_latched <= key_value;
+              page_index  <= 0;
+              show_active <= '1';
+            elsif next_pulse = '1' and show_active = '1' then
+              if page_index = C_LAST_PAGE then
+                -- End of key display: turn all HEX off until restart button.
+                show_active <= '0';
+              else
+                page_index <= page_index + 1;
+              end if;
             end if;
           end if;
         end if;
@@ -146,10 +184,10 @@ begin
   restart_pulse <= btn_restart_ff0 and (not btn_restart_ff1);
 
   -- Left-to-right display order: HEX5 ... HEX0
-  hex5 <= digit_segs(key_latched, show_active, page_index, 0);
-  hex4 <= digit_segs(key_latched, show_active, page_index, 1);
-  hex3 <= digit_segs(key_latched, show_active, page_index, 2);
-  hex2 <= digit_segs(key_latched, show_active, page_index, 3);
-  hex1 <= digit_segs(key_latched, show_active, page_index, 4);
-  hex0 <= digit_segs(key_latched, show_active, page_index, 5);
+  hex5 <= greeting_segs(0) when greeting_active = '1' else digit_segs(key_latched, show_active, page_index, 0);
+  hex4 <= greeting_segs(1) when greeting_active = '1' else digit_segs(key_latched, show_active, page_index, 1);
+  hex3 <= greeting_segs(2) when greeting_active = '1' else digit_segs(key_latched, show_active, page_index, 2);
+  hex2 <= greeting_segs(3) when greeting_active = '1' else digit_segs(key_latched, show_active, page_index, 3);
+  hex1 <= greeting_segs(4) when greeting_active = '1' else digit_segs(key_latched, show_active, page_index, 4);
+  hex0 <= greeting_segs(5) when greeting_active = '1' else digit_segs(key_latched, show_active, page_index, 5);
 end architecture;

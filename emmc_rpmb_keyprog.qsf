@@ -20,10 +20,11 @@ set_global_assignment -name SDC_FILE emmc_slave_top.sdc
 set_location_assignment PIN_P11 -to clk_50MHz
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to clk_50MHz
 
-# eMMC emulation pins on GPIO header
-set_location_assignment PIN_V10 -to emmc_clk
-set_location_assignment PIN_W10 -to emmc_cmd
-set_location_assignment PIN_V9 -to emmc_dat0
+# eMMC emulation pins on Arduino header
+# ARDUINO_IO[0] -> PIN_AB5, ARDUINO_IO[1] -> PIN_AB6, ARDUINO_IO[2] -> PIN_AB7
+set_location_assignment PIN_AB5 -to emmc_clk
+set_location_assignment PIN_AB6 -to emmc_cmd
+set_location_assignment PIN_AB7 -to emmc_dat0
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_clk
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_cmd
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_dat0
