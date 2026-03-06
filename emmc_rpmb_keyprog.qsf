@@ -1,24 +1,42 @@
-# DE10-Lite concrete pin mapping snippet (based on Terasic/Intel default map)
+# Quartus Prime Lite project file (safe baseline)
+# Target board: Terasic DE10-Lite (MAX 10)
 
-# Clock input (50 MHz)
+set_global_assignment -name FAMILY "MAX 10"
+set_global_assignment -name DEVICE 10M50DAF484C6GES
+set_global_assignment -name TOP_LEVEL_ENTITY emmc_slave_top
+
+# Source files
+set_global_assignment -name VHDL_FILE crc_modules.vhd
+set_global_assignment -name VHDL_FILE cmd_decoder.vhd
+set_global_assignment -name VHDL_FILE rpmb_logic.vhd
+set_global_assignment -name VHDL_FILE led_status.vhd
+set_global_assignment -name VHDL_FILE key_display_7seg.vhd
+set_global_assignment -name VHDL_FILE emmc_slave_top.vhd
+
+# Timing constraints
+set_global_assignment -name SDC_FILE emmc_slave_top.sdc
+
+# Clock input
 set_location_assignment PIN_P11 -to clk_50MHz
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to clk_50MHz
 
-# eMMC emulation signals mapped to GPIO header lines
-# GPIO[0] -> PIN_V10, GPIO[1] -> PIN_W10, GPIO[2] -> PIN_V9
+# eMMC emulation pins on GPIO header
 set_location_assignment PIN_V10 -to emmc_clk
 set_location_assignment PIN_W10 -to emmc_cmd
 set_location_assignment PIN_V9 -to emmc_dat0
-
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_clk
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_cmd
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_dat0
-
-# For bidirectional open-drain style CMD/DAT behavior in SD mode.
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to emmc_cmd
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to emmc_dat0
 
-# LED outputs for key-program success indication (top-level port: ledr[9..0])
+# Buttons (DE10-Lite KEY buttons, active-low)
+set_location_assignment PIN_B8 -to btn_next
+set_location_assignment PIN_A7 -to btn_restart
+set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to btn_next
+set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to btn_restart
+
+# LEDR outputs
 set_location_assignment PIN_A8 -to ledr[0]
 set_location_assignment PIN_A9 -to ledr[1]
 set_location_assignment PIN_A10 -to ledr[2]
@@ -29,7 +47,6 @@ set_location_assignment PIN_E14 -to ledr[6]
 set_location_assignment PIN_D14 -to ledr[7]
 set_location_assignment PIN_A11 -to ledr[8]
 set_location_assignment PIN_B11 -to ledr[9]
-
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[0]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[2]
@@ -41,14 +58,7 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[7]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[8]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[9]
 
-# Button inputs for key display navigation (DE10-Lite KEY buttons, active-low)
-set_location_assignment PIN_B8 -to btn_next
-set_location_assignment PIN_A7 -to btn_restart
-
-set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to btn_next
-set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to btn_restart
-
-# 7-segment display outputs (HEX0..HEX5), segments [6:0]
+# HEX displays (segments [6:0])
 set_location_assignment PIN_C14 -to hex0[0]
 set_location_assignment PIN_E15 -to hex0[1]
 set_location_assignment PIN_C15 -to hex0[2]
@@ -56,7 +66,6 @@ set_location_assignment PIN_C16 -to hex0[3]
 set_location_assignment PIN_E16 -to hex0[4]
 set_location_assignment PIN_D17 -to hex0[5]
 set_location_assignment PIN_C17 -to hex0[6]
-
 set_location_assignment PIN_C18 -to hex1[0]
 set_location_assignment PIN_D18 -to hex1[1]
 set_location_assignment PIN_E18 -to hex1[2]
@@ -64,7 +73,6 @@ set_location_assignment PIN_B16 -to hex1[3]
 set_location_assignment PIN_A17 -to hex1[4]
 set_location_assignment PIN_A18 -to hex1[5]
 set_location_assignment PIN_B17 -to hex1[6]
-
 set_location_assignment PIN_B20 -to hex2[0]
 set_location_assignment PIN_A20 -to hex2[1]
 set_location_assignment PIN_B19 -to hex2[2]
@@ -72,7 +80,6 @@ set_location_assignment PIN_A21 -to hex2[3]
 set_location_assignment PIN_B21 -to hex2[4]
 set_location_assignment PIN_C22 -to hex2[5]
 set_location_assignment PIN_B22 -to hex2[6]
-
 set_location_assignment PIN_F21 -to hex3[0]
 set_location_assignment PIN_E22 -to hex3[1]
 set_location_assignment PIN_E21 -to hex3[2]
@@ -80,7 +87,6 @@ set_location_assignment PIN_C19 -to hex3[3]
 set_location_assignment PIN_C20 -to hex3[4]
 set_location_assignment PIN_D19 -to hex3[5]
 set_location_assignment PIN_E17 -to hex3[6]
-
 set_location_assignment PIN_F18 -to hex4[0]
 set_location_assignment PIN_E20 -to hex4[1]
 set_location_assignment PIN_E19 -to hex4[2]
@@ -88,7 +94,6 @@ set_location_assignment PIN_J18 -to hex4[3]
 set_location_assignment PIN_H19 -to hex4[4]
 set_location_assignment PIN_F19 -to hex4[5]
 set_location_assignment PIN_F20 -to hex4[6]
-
 set_location_assignment PIN_J20 -to hex5[0]
 set_location_assignment PIN_K20 -to hex5[1]
 set_location_assignment PIN_L18 -to hex5[2]
@@ -96,7 +101,6 @@ set_location_assignment PIN_N18 -to hex5[3]
 set_location_assignment PIN_M20 -to hex5[4]
 set_location_assignment PIN_N19 -to hex5[5]
 set_location_assignment PIN_N20 -to hex5[6]
-
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[0]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[2]
