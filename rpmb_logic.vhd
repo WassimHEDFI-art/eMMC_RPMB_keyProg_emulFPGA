@@ -10,7 +10,12 @@ entity rpmb_logic is
     byte_valid     : in  std_logic;
     byte_in        : in  std_logic_vector(7 downto 0);
     frame_done     : in  std_logic;
-    key_programmed : out std_logic
+    consume_result : in  std_logic;
+    key_programmed : out std_logic;
+    result_ready   : out std_logic;
+    result_code    : out std_logic_vector(15 downto 0);
+    resp_type      : out std_logic_vector(15 downto 0);
+    req_type_last  : out std_logic_vector(15 downto 0)
   );
 end entity;
 
@@ -24,6 +29,10 @@ architecture rtl of rpmb_logic is
   signal otp_key            : std_logic_vector(255 downto 0) := (others => '0');
   signal key_programmed_reg : std_logic := '0';
   signal request_type       : std_logic_vector(15 downto 0) := (others => '0');
+  signal result_ready_reg   : std_logic := '0';
+  signal result_code_reg    : std_logic_vector(15 downto 0) := (others => '0');
+  signal resp_type_reg      : std_logic_vector(15 downto 0) := (others => '0');
+  signal req_type_last_reg  : std_logic_vector(15 downto 0) := (others => '0');
 begin
   process (clk)
   begin
@@ -35,7 +44,15 @@ begin
         otp_key            <= (others => '0');
         key_programmed_reg <= '0';
         request_type       <= (others => '0');
+        result_ready_reg   <= '0';
+        result_code_reg    <= (others => '0');
+        resp_type_reg      <= (others => '0');
+        req_type_last_reg  <= (others => '0');
       else
+        if consume_result = '1' then
+          result_ready_reg <= '0';
+        end if;
+
         case state is
           when IDLE =>
             byte_index   <= 0;
@@ -71,9 +88,22 @@ begin
             end if;
 
             if frame_done = '1' then
+              req_type_last_reg <= request_type;
+
               if (request_type = x"0001") and (key_programmed_reg = '0') then
                 otp_key            <= key_shadow;
                 key_programmed_reg <= '1';
+                result_code_reg    <= x"0000";
+                resp_type_reg      <= x"0100";
+                result_ready_reg   <= '1';
+              elsif (request_type = x"0001") and (key_programmed_reg = '1') then
+                -- Key already programmed: model as generic operation failure.
+                result_code_reg    <= x"0001";
+                resp_type_reg      <= x"0100";
+                result_ready_reg   <= '1';
+              elsif request_type = x"0005" then
+                -- Result read request frame received; keep previous result pending.
+                null;
               end if;
               state <= IDLE;
             end if;
@@ -83,4 +113,8 @@ begin
   end process;
 
   key_programmed <= key_programmed_reg;
+  result_ready   <= result_ready_reg;
+  result_code    <= result_code_reg;
+  resp_type      <= resp_type_reg;
+  req_type_last  <= req_type_last_reg;
 end architecture;

@@ -12,6 +12,7 @@ entity cmd_decoder is
     cmd_oe        : out std_logic;
     cmd23_seen    : out std_logic;
     cmd25_seen    : out std_logic;
+    cmd18_seen    : out std_logic;
     block_count   : out std_logic_vector(15 downto 0)
   );
 end entity;
@@ -31,6 +32,7 @@ architecture rtl of cmd_decoder is
 
   signal cmd23_seen_reg : std_logic := '0';
   signal cmd25_seen_reg : std_logic := '0';
+  signal cmd18_seen_reg : std_logic := '0';
   signal block_count_reg: std_logic_vector(15 downto 0) := (others => '0');
 
   signal r1_status      : std_logic_vector(31 downto 0) := (others => '0');
@@ -38,6 +40,7 @@ begin
   process (emmc_clk)
     variable cmd_index   : unsigned(5 downto 0);
     variable cmd_arg     : std_logic_vector(31 downto 0);
+    variable cmd_frame   : std_logic_vector(47 downto 0);
     variable r1_header   : std_logic_vector(39 downto 0);
     variable r1_crc      : std_logic_vector(6 downto 0);
     variable r1_frame    : std_logic_vector(47 downto 0);
@@ -53,34 +56,39 @@ begin
         cmd_oe_reg      <= '0';
         cmd23_seen_reg  <= '0';
         cmd25_seen_reg  <= '0';
+        cmd18_seen_reg  <= '0';
         block_count_reg <= (others => '0');
         r1_status       <= (others => '0');
       else
         cmd23_seen_reg <= '0';
         cmd25_seen_reg <= '0';
+        cmd18_seen_reg <= '0';
 
         case state is
           when IDLE =>
             cmd_oe_reg  <= '0';
             cmd_out_reg <= '1';
             if cmd_in = '0' then
-              rx_shift(47 downto 1) <= (others => '0');
-              rx_shift(0) <= cmd_in;
+              rx_shift <= (others => '0');
+              rx_shift(47) <= cmd_in;
               rx_bit_cnt <= 1;
               state <= CMD_RX;
             end if;
 
           when CMD_RX =>
-            rx_shift <= rx_shift(46 downto 0) & cmd_in;
+            cmd_frame := rx_shift(46 downto 0) & cmd_in;
+            rx_shift <= cmd_frame;
             if rx_bit_cnt = 47 then
-              cmd_index := unsigned(rx_shift(45 downto 40));
-              cmd_arg   := rx_shift(39 downto 8);
+              cmd_index := unsigned(cmd_frame(45 downto 40));
+              cmd_arg   := cmd_frame(39 downto 8);
 
               if cmd_index = to_unsigned(23, 6) then
                 block_count_reg <= cmd_arg(15 downto 0);
                 cmd23_seen_reg  <= '1';
               elsif cmd_index = to_unsigned(25, 6) then
                 cmd25_seen_reg  <= '1';
+              elsif cmd_index = to_unsigned(18, 6) then
+                cmd18_seen_reg  <= '1';
               end if;
 
               r1_header(39)           := '0';
@@ -124,5 +132,6 @@ begin
   cmd_oe      <= cmd_oe_reg;
   cmd23_seen  <= cmd23_seen_reg;
   cmd25_seen  <= cmd25_seen_reg;
+  cmd18_seen  <= cmd18_seen_reg;
   block_count <= block_count_reg;
 end architecture;

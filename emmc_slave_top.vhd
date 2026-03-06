@@ -1,6 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.crc_modules_pkg.all;
 
 entity emmc_slave_top is
   port (
@@ -12,7 +13,7 @@ entity emmc_slave_top is
 end entity;
 
 architecture rtl of emmc_slave_top is
-  type data_state_t is (IDLE, DATA_RX, CRC_RX);
+  type data_state_t is (IDLE, DATA_RX, CRC_RX, DATA_TX, CRC_TX, END_BIT_TX);
 
   signal reset_50            : std_logic := '1';
   signal reset_cnt           : unsigned(5 downto 0) := (others => '0');
@@ -24,7 +25,10 @@ architecture rtl of emmc_slave_top is
   signal cmd_oe              : std_logic;
   signal cmd23_seen          : std_logic;
   signal cmd25_seen          : std_logic;
+  signal cmd18_seen          : std_logic;
   signal block_count         : std_logic_vector(15 downto 0);
+  signal cmd25_pending       : std_logic := '0';
+  signal cmd18_pending       : std_logic := '0';
 
   signal data_state          : data_state_t := IDLE;
   signal frame_active        : std_logic := '0';
@@ -37,13 +41,23 @@ architecture rtl of emmc_slave_top is
   signal rx_byte             : std_logic_vector(7 downto 0) := (others => '0');
   signal rx_byte_valid       : std_logic := '0';
 
+  signal tx_frame            : std_logic_vector(4095 downto 0) := (others => '0');
+  signal tx_crc16            : std_logic_vector(15 downto 0) := (others => '0');
+  signal dat0_out            : std_logic := '1';
+  signal dat0_oe             : std_logic := '0';
+
+  signal consume_result      : std_logic := '0';
+
   signal key_programmed      : std_logic;
+  signal result_ready        : std_logic;
+  signal result_code         : std_logic_vector(15 downto 0);
+  signal resp_type           : std_logic_vector(15 downto 0);
+  signal req_type_last       : std_logic_vector(15 downto 0);
 begin
   cmd_in <= emmc_cmd;
   emmc_cmd <= cmd_out when cmd_oe = '1' else 'Z';
 
-  -- DAT0 is only sampled in this key-programming emulator; no data transmit path.
-  emmc_dat0 <= 'Z';
+  emmc_dat0 <= dat0_out when dat0_oe = '1' else 'Z';
 
   process (clk_50MHz)
   begin
@@ -74,10 +88,13 @@ begin
       cmd_oe      => cmd_oe,
       cmd23_seen  => cmd23_seen,
       cmd25_seen  => cmd25_seen,
+      cmd18_seen  => cmd18_seen,
       block_count => block_count
     );
 
   process (emmc_clk)
+    variable v_frame : std_logic_vector(4095 downto 0);
+    variable v_crc16 : std_logic_vector(15 downto 0);
   begin
     if rising_edge(emmc_clk) then
       if reset_sync_1 = '1' then
@@ -90,21 +107,64 @@ begin
         bit_in_byte   <= 0;
         rx_byte       <= (others => '0');
         rx_byte_valid <= '0';
+        cmd25_pending <= '0';
+        cmd18_pending <= '0';
+        tx_frame      <= (others => '0');
+        tx_crc16      <= (others => '0');
+        dat0_out      <= '1';
+        dat0_oe       <= '0';
+        consume_result <= '0';
       else
         frame_done    <= '0';
         rx_byte_valid <= '0';
+        consume_result <= '0';
+
+        if cmd25_seen = '1' then
+          cmd25_pending <= '1';
+        end if;
+
+        if cmd18_seen = '1' then
+          cmd18_pending <= '1';
+        end if;
 
         case data_state is
           when IDLE =>
             frame_active <= '0';
-            if cmd25_seen = '1' and unsigned(block_count) /= 0 then
-              -- Wait for start bit on DAT0 for one 512-byte RPMB data frame.
+            dat0_oe <= '0';
+            dat0_out <= '1';
+
+            if cmd25_pending = '1' and unsigned(block_count) = 1 then
+              -- Wait for DAT0 start bit from host for one 512-byte RPMB data frame.
               if emmc_dat0 = '0' then
-                data_state   <= DATA_RX;
-                frame_active <= '1';
-                bit_count    <= 0;
-                bit_in_byte  <= 0;
+                data_state    <= DATA_RX;
+                frame_active  <= '1';
+                bit_count     <= 0;
+                bit_in_byte   <= 0;
+                cmd25_pending <= '0';
               end if;
+            elsif cmd18_pending = '1' and result_ready = '1' and req_type_last = x"0005" then
+              -- Build one 512-byte result response frame (mostly zero).
+              -- Tail bytes [508..509] = Result code (MSB first)
+              -- Tail bytes [510..511] = Response type (MSB first)
+              v_frame := (others => '0');
+              v_frame((511 - 508) * 8 + 7 downto (511 - 508) * 8) := result_code(15 downto 8);
+              v_frame((511 - 509) * 8 + 7 downto (511 - 509) * 8) := result_code(7 downto 0);
+              v_frame((511 - 510) * 8 + 7 downto (511 - 510) * 8) := resp_type(15 downto 8);
+              v_frame((511 - 511) * 8 + 7 downto (511 - 511) * 8) := resp_type(7 downto 0);
+              tx_frame <= v_frame;
+
+              -- Compute CRC16 over the 4096 data bits.
+              v_crc16 := (others => '0');
+              for i in 0 to 4095 loop
+                v_crc16 := crc16_next(v_crc16, v_frame(4095 - i));
+              end loop;
+              tx_crc16 <= v_crc16;
+
+              data_state    <= DATA_TX;
+              bit_count     <= 0;
+              dat0_oe       <= '1';
+              dat0_out      <= '0'; -- data start bit
+              cmd18_pending <= '0';
             end if;
 
           when DATA_RX =>
@@ -126,7 +186,7 @@ begin
             end if;
 
           when CRC_RX =>
-            -- Skip 16 CRC bits and one trailing end bit from host.
+            -- Ignore 16 CRC bits and one trailing end bit from host.
             if crc_bit_count = 16 then
               frame_done   <= '1';
               frame_active <= '0';
@@ -134,6 +194,31 @@ begin
             else
               crc_bit_count <= crc_bit_count + 1;
             end if;
+
+          when DATA_TX =>
+            dat0_oe  <= '1';
+            dat0_out <= tx_frame(4095 - bit_count);
+            if bit_count = 4095 then
+              data_state    <= CRC_TX;
+              crc_bit_count <= 0;
+            else
+              bit_count <= bit_count + 1;
+            end if;
+
+          when CRC_TX =>
+            dat0_oe  <= '1';
+            dat0_out <= tx_crc16(15 - crc_bit_count);
+            if crc_bit_count = 15 then
+              data_state <= END_BIT_TX;
+            else
+              crc_bit_count <= crc_bit_count + 1;
+            end if;
+
+          when END_BIT_TX =>
+            dat0_oe        <= '1';
+            dat0_out       <= '1';
+            consume_result <= '1';
+            data_state     <= IDLE;
         end case;
       end if;
     end if;
@@ -147,6 +232,11 @@ begin
       byte_valid     => rx_byte_valid,
       byte_in        => rx_byte,
       frame_done     => frame_done,
-      key_programmed => key_programmed
+      consume_result => consume_result,
+      key_programmed => key_programmed,
+      result_ready   => result_ready,
+      result_code    => result_code,
+      resp_type      => resp_type,
+      req_type_last  => req_type_last
     );
 end architecture;
