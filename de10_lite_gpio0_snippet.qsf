@@ -1,0 +1,15 @@
+# DE10-Lite GPIO_0 mapping snippet for eMMC emulation signals
+# Update PIN_* values to match your exact GPIO_0 header pins from the board pinout.
+# Example mapping: GPIO_0[0] -> emmc_clk, GPIO_0[1] -> emmc_cmd, GPIO_0[2] -> emmc_dat0
+
+set_location_assignment PIN_<GPIO0_0_PIN> -to emmc_clk
+set_location_assignment PIN_<GPIO0_1_PIN> -to emmc_cmd
+set_location_assignment PIN_<GPIO0_2_PIN> -to emmc_dat0
+
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_clk
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_cmd
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_dat0
+
+# For bidirectional open-drain style CMD behavior in SD mode:
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to emmc_cmd
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to emmc_dat0
