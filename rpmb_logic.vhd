@@ -10,6 +10,7 @@ entity rpmb_logic is
     byte_valid     : in  std_logic;
     byte_in        : in  std_logic_vector(7 downto 0);
     frame_done     : in  std_logic;
+    cmd23_reliable : in  std_logic;
     consume_result : in  std_logic;
     key_programmed : out std_logic;
     result_ready   : out std_logic;
@@ -90,20 +91,32 @@ begin
             if frame_done = '1' then
               req_type_last_reg <= request_type;
 
-              if (request_type = x"0001") and (key_programmed_reg = '0') then
+              if (request_type = x"0001") and (key_programmed_reg = '0') and (cmd23_reliable = '1') then
                 otp_key            <= key_shadow;
                 key_programmed_reg <= '1';
                 result_code_reg    <= x"0000";
                 resp_type_reg      <= x"0100";
                 result_ready_reg   <= '1';
-              elsif (request_type = x"0001") and (key_programmed_reg = '1') then
-                -- Key already programmed: model as generic operation failure.
+              elsif (request_type = x"0001") and (key_programmed_reg = '0') and (cmd23_reliable = '0') then
+                -- Missing reliable-write precondition for key programming.
                 result_code_reg    <= x"0001";
                 resp_type_reg      <= x"0100";
                 result_ready_reg   <= '1';
+              elsif (request_type = x"0001") and (key_programmed_reg = '1') then
+                -- Programming attempt after OTP is set => write failure.
+                result_code_reg    <= x"0005";
+                resp_type_reg      <= x"0100";
+                result_ready_reg   <= '1';
               elsif request_type = x"0005" then
-                -- Result read request frame received; keep previous result pending.
-                null;
+                if key_programmed_reg = '0' then
+                  -- Authentication key not yet programmed.
+                  result_code_reg    <= x"0007";
+                  resp_type_reg      <= x"0100";
+                  result_ready_reg   <= '1';
+                else
+                  -- Result read request frame received; keep previous result pending.
+                  null;
+                end if;
               end if;
               state <= IDLE;
             end if;

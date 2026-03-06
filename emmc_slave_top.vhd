@@ -13,7 +13,7 @@ entity emmc_slave_top is
 end entity;
 
 architecture rtl of emmc_slave_top is
-  type data_state_t is (IDLE, DATA_RX, CRC_RX, DATA_TX, CRC_TX, END_BIT_TX);
+  type data_state_t is (IDLE, DATA_RX, CRC_RX, WRITE_BUSY, DATA_TX, CRC_TX, END_BIT_TX);
 
   signal reset_50            : std_logic := '1';
   signal reset_cnt           : unsigned(5 downto 0) := (others => '0');
@@ -26,6 +26,7 @@ architecture rtl of emmc_slave_top is
   signal cmd23_seen          : std_logic;
   signal cmd25_seen          : std_logic;
   signal cmd18_seen          : std_logic;
+  signal cmd23_reliable      : std_logic;
   signal block_count         : std_logic_vector(15 downto 0);
   signal cmd25_pending       : std_logic := '0';
   signal cmd18_pending       : std_logic := '0';
@@ -47,6 +48,7 @@ architecture rtl of emmc_slave_top is
   signal dat0_oe             : std_logic := '0';
 
   signal consume_result      : std_logic := '0';
+  signal busy_count          : integer range 0 to 63 := 0;
 
   signal key_programmed      : std_logic;
   signal result_ready        : std_logic;
@@ -89,6 +91,7 @@ begin
       cmd23_seen  => cmd23_seen,
       cmd25_seen  => cmd25_seen,
       cmd18_seen  => cmd18_seen,
+      cmd23_reliable => cmd23_reliable,
       block_count => block_count
     );
 
@@ -114,17 +117,26 @@ begin
         dat0_out      <= '1';
         dat0_oe       <= '0';
         consume_result <= '0';
+        busy_count    <= 0;
       else
         frame_done    <= '0';
         rx_byte_valid <= '0';
         consume_result <= '0';
 
         if cmd25_seen = '1' then
-          cmd25_pending <= '1';
+          if unsigned(block_count) = 1 then
+            cmd25_pending <= '1';
+          else
+            cmd25_pending <= '0';
+          end if;
         end if;
 
         if cmd18_seen = '1' then
-          cmd18_pending <= '1';
+          if unsigned(block_count) = 1 then
+            cmd18_pending <= '1';
+          else
+            cmd18_pending <= '0';
+          end if;
         end if;
 
         case data_state is
@@ -142,7 +154,7 @@ begin
                 bit_in_byte   <= 0;
                 cmd25_pending <= '0';
               end if;
-            elsif cmd18_pending = '1' and result_ready = '1' and req_type_last = x"0005" then
+            elsif cmd18_pending = '1' and result_ready = '1' and req_type_last = x"0005" and unsigned(block_count) = 1 then
               -- Build one 512-byte result response frame (mostly zero).
               -- Tail bytes [508..509] = Result code (MSB first)
               -- Tail bytes [510..511] = Response type (MSB first)
@@ -190,9 +202,22 @@ begin
             if crc_bit_count = 16 then
               frame_done   <= '1';
               frame_active <= '0';
-              data_state   <= IDLE;
+              data_state   <= WRITE_BUSY;
+              busy_count   <= 0;
             else
               crc_bit_count <= crc_bit_count + 1;
+            end if;
+
+          when WRITE_BUSY =>
+            -- DAT0 busy indication after host write frame (programming/request busy).
+            dat0_oe  <= '1';
+            dat0_out <= '0';
+            if busy_count = 31 then
+              dat0_oe    <= '0';
+              dat0_out   <= '1';
+              data_state <= IDLE;
+            else
+              busy_count <= busy_count + 1;
             end if;
 
           when DATA_TX =>
@@ -232,6 +257,7 @@ begin
       byte_valid     => rx_byte_valid,
       byte_in        => rx_byte,
       frame_done     => frame_done,
+      cmd23_reliable => cmd23_reliable,
       consume_result => consume_result,
       key_programmed => key_programmed,
       result_ready   => result_ready,

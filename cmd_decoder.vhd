@@ -13,6 +13,7 @@ entity cmd_decoder is
     cmd23_seen    : out std_logic;
     cmd25_seen    : out std_logic;
     cmd18_seen    : out std_logic;
+    cmd23_reliable: out std_logic;
     block_count   : out std_logic_vector(15 downto 0)
   );
 end entity;
@@ -33,14 +34,14 @@ architecture rtl of cmd_decoder is
   signal cmd23_seen_reg : std_logic := '0';
   signal cmd25_seen_reg : std_logic := '0';
   signal cmd18_seen_reg : std_logic := '0';
+  signal cmd23_reliable_reg : std_logic := '0';
   signal block_count_reg: std_logic_vector(15 downto 0) := (others => '0');
-
-  signal r1_status      : std_logic_vector(31 downto 0) := (others => '0');
 begin
   process (emmc_clk)
     variable cmd_index   : unsigned(5 downto 0);
     variable cmd_arg     : std_logic_vector(31 downto 0);
     variable cmd_frame   : std_logic_vector(47 downto 0);
+    variable r1_status_v : std_logic_vector(31 downto 0);
     variable r1_header   : std_logic_vector(39 downto 0);
     variable r1_crc      : std_logic_vector(6 downto 0);
     variable r1_frame    : std_logic_vector(47 downto 0);
@@ -57,8 +58,8 @@ begin
         cmd23_seen_reg  <= '0';
         cmd25_seen_reg  <= '0';
         cmd18_seen_reg  <= '0';
+        cmd23_reliable_reg <= '0';
         block_count_reg <= (others => '0');
-        r1_status       <= (others => '0');
       else
         cmd23_seen_reg <= '0';
         cmd25_seen_reg <= '0';
@@ -81,27 +82,37 @@ begin
             if rx_bit_cnt = 47 then
               cmd_index := unsigned(cmd_frame(45 downto 40));
               cmd_arg   := cmd_frame(39 downto 8);
+              r1_status_v := (others => '0');
 
               if cmd_index = to_unsigned(23, 6) then
                 block_count_reg <= cmd_arg(15 downto 0);
+                cmd23_reliable_reg <= cmd_arg(31);
                 cmd23_seen_reg  <= '1';
               elsif cmd_index = to_unsigned(25, 6) then
                 cmd25_seen_reg  <= '1';
+                if unsigned(block_count_reg) /= 1 then
+                  -- General failure indication for invalid preceding block-count setup.
+                  r1_status_v(19) := '1';
+                end if;
               elsif cmd_index = to_unsigned(18, 6) then
                 cmd18_seen_reg  <= '1';
+                if unsigned(block_count_reg) /= 1 then
+                  -- General failure indication for invalid preceding block-count setup.
+                  r1_status_v(19) := '1';
+                end if;
               end if;
 
               r1_header(39)           := '0';
               r1_header(38)           := '0';
               r1_header(37 downto 32) := std_logic_vector(cmd_index);
-              r1_header(31 downto 0)  := r1_status;
+              r1_header(31 downto 0)  := r1_status_v;
 
               r1_crc := crc7_calc(r1_header);
 
               r1_frame(47)            := '0';
               r1_frame(46)            := '0';
               r1_frame(45 downto 40)  := std_logic_vector(cmd_index);
-              r1_frame(39 downto 8)   := r1_status;
+              r1_frame(39 downto 8)   := r1_status_v;
               r1_frame(7 downto 1)    := r1_crc;
               r1_frame(0)             := '1';
 
@@ -133,5 +144,6 @@ begin
   cmd23_seen  <= cmd23_seen_reg;
   cmd25_seen  <= cmd25_seen_reg;
   cmd18_seen  <= cmd18_seen_reg;
+  cmd23_reliable <= cmd23_reliable_reg;
   block_count <= block_count_reg;
 end architecture;
