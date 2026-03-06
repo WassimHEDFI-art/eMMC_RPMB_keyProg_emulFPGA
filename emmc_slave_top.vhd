@@ -23,6 +23,7 @@ end entity;
 
 architecture rtl of emmc_slave_top is
   type data_state_t is (IDLE, DATA_RX, CRC_RX, WRITE_BUSY, DATA_TX, CRC_TX, END_BIT_TX);
+  constant C_DATA_ONLY_MODE : std_logic := '1';
 
   signal reset_50            : std_logic := '1';
   signal reset_cnt           : unsigned(5 downto 0) := (others => '0');
@@ -155,8 +156,16 @@ begin
             dat0_oe <= '0';
             dat0_out <= '1';
 
-            if cmd25_pending = '1' and unsigned(block_count) = 1 then
-              -- Wait for DAT0 start bit from host for one 512-byte RPMB data frame.
+            if C_DATA_ONLY_MODE = '1' then
+              -- Bring-up mode: capture one full 512-byte frame directly from DAT0.
+              if emmc_dat0 = '0' then
+                data_state   <= DATA_RX;
+                frame_active <= '1';
+                bit_count    <= 0;
+                bit_in_byte  <= 0;
+              end if;
+            elsif cmd25_pending = '1' and unsigned(block_count) = 1 then
+              -- Normal mode: wait for DAT0 data-start after valid CMD25 sequence.
               if emmc_dat0 = '0' then
                 data_state    <= DATA_RX;
                 frame_active  <= '1';
@@ -268,6 +277,7 @@ begin
       byte_in        => rx_byte,
       frame_done     => frame_done,
       cmd23_reliable => cmd23_reliable,
+      data_only_mode => C_DATA_ONLY_MODE,
       consume_result => consume_result,
       key_programmed => key_programmed,
       programmed_key => programmed_key,

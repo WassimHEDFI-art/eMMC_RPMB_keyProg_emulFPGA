@@ -11,6 +11,7 @@ entity rpmb_logic is
     byte_in        : in  std_logic_vector(7 downto 0);
     frame_done     : in  std_logic;
     cmd23_reliable : in  std_logic;
+    data_only_mode : in  std_logic;
     consume_result : in  std_logic;
     key_programmed : out std_logic;
     programmed_key : out std_logic_vector(255 downto 0);
@@ -92,13 +93,13 @@ begin
             if frame_done = '1' then
               req_type_last_reg <= request_type;
 
-              if (request_type = x"0001") and (key_programmed_reg = '0') and (cmd23_reliable = '1') then
+              if (request_type = x"0001") and (key_programmed_reg = '0') and ((cmd23_reliable = '1') or (data_only_mode = '1')) then
                 otp_key            <= key_shadow;
                 key_programmed_reg <= '1';
                 result_code_reg    <= x"0000";
                 resp_type_reg      <= x"0100";
                 result_ready_reg   <= '1';
-              elsif (request_type = x"0001") and (key_programmed_reg = '0') and (cmd23_reliable = '0') then
+              elsif (request_type = x"0001") and (key_programmed_reg = '0') and (cmd23_reliable = '0') and (data_only_mode = '0') then
                 -- Missing reliable-write precondition for key programming.
                 result_code_reg    <= x"0001";
                 resp_type_reg      <= x"0100";
