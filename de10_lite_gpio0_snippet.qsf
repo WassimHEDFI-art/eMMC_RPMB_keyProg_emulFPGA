@@ -13,3 +13,128 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to emmc_dat0
 # For bidirectional open-drain style CMD behavior in SD mode:
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to emmc_cmd
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to emmc_dat0
+
+# LED outputs for key-program success indication (top-level port: ledr[9..0])
+# Replace PIN_<LEDRx_PIN> with DE10-Lite LEDR pin names from your board pinout.
+set_location_assignment PIN_<LEDR0_PIN> -to ledr[0]
+set_location_assignment PIN_<LEDR1_PIN> -to ledr[1]
+set_location_assignment PIN_<LEDR2_PIN> -to ledr[2]
+set_location_assignment PIN_<LEDR3_PIN> -to ledr[3]
+set_location_assignment PIN_<LEDR4_PIN> -to ledr[4]
+set_location_assignment PIN_<LEDR5_PIN> -to ledr[5]
+set_location_assignment PIN_<LEDR6_PIN> -to ledr[6]
+set_location_assignment PIN_<LEDR7_PIN> -to ledr[7]
+set_location_assignment PIN_<LEDR8_PIN> -to ledr[8]
+set_location_assignment PIN_<LEDR9_PIN> -to ledr[9]
+
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[7]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[8]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ledr[9]
+
+# Button inputs for key display navigation
+# Replace with your chosen push-button pin names (for example DE10-Lite KEY pins).
+set_location_assignment PIN_<BTN_NEXT_PIN> -to btn_next
+set_location_assignment PIN_<BTN_RESTART_PIN> -to btn_restart
+
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to btn_next
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to btn_restart
+
+# 7-segment display outputs (HEX0..HEX5), 7 bits each (g..a)
+# Replace PIN_<HEXx_n_PIN> with the corresponding DE10-Lite HEX segment pins.
+set_location_assignment PIN_<HEX0_0_PIN> -to hex0[0]
+set_location_assignment PIN_<HEX0_1_PIN> -to hex0[1]
+set_location_assignment PIN_<HEX0_2_PIN> -to hex0[2]
+set_location_assignment PIN_<HEX0_3_PIN> -to hex0[3]
+set_location_assignment PIN_<HEX0_4_PIN> -to hex0[4]
+set_location_assignment PIN_<HEX0_5_PIN> -to hex0[5]
+set_location_assignment PIN_<HEX0_6_PIN> -to hex0[6]
+
+set_location_assignment PIN_<HEX1_0_PIN> -to hex1[0]
+set_location_assignment PIN_<HEX1_1_PIN> -to hex1[1]
+set_location_assignment PIN_<HEX1_2_PIN> -to hex1[2]
+set_location_assignment PIN_<HEX1_3_PIN> -to hex1[3]
+set_location_assignment PIN_<HEX1_4_PIN> -to hex1[4]
+set_location_assignment PIN_<HEX1_5_PIN> -to hex1[5]
+set_location_assignment PIN_<HEX1_6_PIN> -to hex1[6]
+
+set_location_assignment PIN_<HEX2_0_PIN> -to hex2[0]
+set_location_assignment PIN_<HEX2_1_PIN> -to hex2[1]
+set_location_assignment PIN_<HEX2_2_PIN> -to hex2[2]
+set_location_assignment PIN_<HEX2_3_PIN> -to hex2[3]
+set_location_assignment PIN_<HEX2_4_PIN> -to hex2[4]
+set_location_assignment PIN_<HEX2_5_PIN> -to hex2[5]
+set_location_assignment PIN_<HEX2_6_PIN> -to hex2[6]
+
+set_location_assignment PIN_<HEX3_0_PIN> -to hex3[0]
+set_location_assignment PIN_<HEX3_1_PIN> -to hex3[1]
+set_location_assignment PIN_<HEX3_2_PIN> -to hex3[2]
+set_location_assignment PIN_<HEX3_3_PIN> -to hex3[3]
+set_location_assignment PIN_<HEX3_4_PIN> -to hex3[4]
+set_location_assignment PIN_<HEX3_5_PIN> -to hex3[5]
+set_location_assignment PIN_<HEX3_6_PIN> -to hex3[6]
+
+set_location_assignment PIN_<HEX4_0_PIN> -to hex4[0]
+set_location_assignment PIN_<HEX4_1_PIN> -to hex4[1]
+set_location_assignment PIN_<HEX4_2_PIN> -to hex4[2]
+set_location_assignment PIN_<HEX4_3_PIN> -to hex4[3]
+set_location_assignment PIN_<HEX4_4_PIN> -to hex4[4]
+set_location_assignment PIN_<HEX4_5_PIN> -to hex4[5]
+set_location_assignment PIN_<HEX4_6_PIN> -to hex4[6]
+
+set_location_assignment PIN_<HEX5_0_PIN> -to hex5[0]
+set_location_assignment PIN_<HEX5_1_PIN> -to hex5[1]
+set_location_assignment PIN_<HEX5_2_PIN> -to hex5[2]
+set_location_assignment PIN_<HEX5_3_PIN> -to hex5[3]
+set_location_assignment PIN_<HEX5_4_PIN> -to hex5[4]
+set_location_assignment PIN_<HEX5_5_PIN> -to hex5[5]
+set_location_assignment PIN_<HEX5_6_PIN> -to hex5[6]
+
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex0[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex1[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex1[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex1[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex1[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex1[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex1[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex1[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex2[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex2[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex2[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex2[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex2[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex2[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex2[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex3[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex3[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex3[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex3[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex3[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex3[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex3[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex4[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex4[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex4[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex4[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex4[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex4[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex4[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex5[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex5[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex5[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex5[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex5[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex5[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to hex5[6]

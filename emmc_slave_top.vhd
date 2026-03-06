@@ -8,7 +8,16 @@ entity emmc_slave_top is
     clk_50MHz : in    std_logic;
     emmc_clk  : in    std_logic;
     emmc_cmd  : inout std_logic;
-    emmc_dat0 : inout std_logic
+    emmc_dat0 : inout std_logic;
+    btn_next  : in    std_logic;
+    btn_restart : in  std_logic;
+    ledr      : out   std_logic_vector(9 downto 0);
+    hex0      : out   std_logic_vector(6 downto 0);
+    hex1      : out   std_logic_vector(6 downto 0);
+    hex2      : out   std_logic_vector(6 downto 0);
+    hex3      : out   std_logic_vector(6 downto 0);
+    hex4      : out   std_logic_vector(6 downto 0);
+    hex5      : out   std_logic_vector(6 downto 0)
   );
 end entity;
 
@@ -55,6 +64,7 @@ architecture rtl of emmc_slave_top is
   signal result_code         : std_logic_vector(15 downto 0);
   signal resp_type           : std_logic_vector(15 downto 0);
   signal req_type_last       : std_logic_vector(15 downto 0);
+  signal programmed_key      : std_logic_vector(255 downto 0);
 begin
   cmd_in <= emmc_cmd;
   emmc_cmd <= cmd_out when cmd_oe = '1' else 'Z';
@@ -260,9 +270,34 @@ begin
       cmd23_reliable => cmd23_reliable,
       consume_result => consume_result,
       key_programmed => key_programmed,
+      programmed_key => programmed_key,
       result_ready   => result_ready,
       result_code    => result_code,
       resp_type      => resp_type,
       req_type_last  => req_type_last
+    );
+
+  u_led_status : entity work.led_status
+    port map (
+      clk            => clk_50MHz,
+      reset          => reset_50,
+      key_programmed => key_programmed,
+      leds           => ledr
+    );
+
+  u_key_display_7seg : entity work.key_display_7seg
+    port map (
+      clk            => clk_50MHz,
+      reset          => reset_50,
+      key_programmed => key_programmed,
+      key_value      => programmed_key,
+      btn_next       => btn_next,
+      btn_restart    => btn_restart,
+      hex0           => hex0,
+      hex1           => hex1,
+      hex2           => hex2,
+      hex3           => hex3,
+      hex4           => hex4,
+      hex5           => hex5
     );
 end architecture;

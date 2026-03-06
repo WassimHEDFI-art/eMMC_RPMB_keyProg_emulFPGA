@@ -13,6 +13,7 @@ entity rpmb_logic is
     cmd23_reliable : in  std_logic;
     consume_result : in  std_logic;
     key_programmed : out std_logic;
+    programmed_key : out std_logic_vector(255 downto 0);
     result_ready   : out std_logic;
     result_code    : out std_logic_vector(15 downto 0);
     resp_type      : out std_logic_vector(15 downto 0);
@@ -126,6 +127,7 @@ begin
   end process;
 
   key_programmed <= key_programmed_reg;
+  programmed_key <= otp_key;
   result_ready   <= result_ready_reg;
   result_code    <= result_code_reg;
   resp_type      <= resp_type_reg;
