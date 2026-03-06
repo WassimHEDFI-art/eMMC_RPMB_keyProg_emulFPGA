@@ -282,6 +282,7 @@ begin
       clk            => clk_50MHz,
       reset          => reset_50,
       key_programmed => key_programmed,
+      btn_restart    => not btn_restart,
       leds           => ledr
     );
 
