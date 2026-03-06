@@ -117,7 +117,8 @@ begin
               r1_frame(0)             := '1';
 
               resp_shift   <= r1_frame;
-              resp_bit_cnt <= 47;
+              -- Start bit is driven immediately in this cycle; continue with bit 46 next.
+              resp_bit_cnt <= 46;
               cmd_oe_reg   <= '1';
               cmd_out_reg  <= r1_frame(47);
               state        <= RESP_TX;
