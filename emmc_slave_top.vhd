@@ -22,7 +22,7 @@ entity emmc_slave_top is
 end entity;
 
 architecture rtl of emmc_slave_top is
-  type dat_state_t is (IDLE, TX_WAIT, TX_START, TX_DATA, TX_CRC, TX_END, RX_WAIT, RX_DATA, RX_CRC, RX_END, RX_ACK, RX_BUSY, RX_BUSY_END);
+  type dat_state_t is (IDLE, TX_WAIT, TX_START, TX_DATA, TX_CRC, TX_END, RX_WAIT, RX_DATA, RX_CRC, RX_END, RX_STOP, RX_ACK, RX_BUSY, RX_BUSY_END);
   type tx_kind_t is (TX_NONE, TX_EXT_CSD, TX_RPMB);
   constant C_WRITE_ACK_TOKEN : std_logic_vector(4 downto 0) := "00101";
 
@@ -382,8 +382,15 @@ begin
             dat0_oe  <= '0';
             dat0_out <= '1';
             rpmb_frame_done <= '1';
-            ack_count <= 0;
-            dat_state <= RX_ACK;
+            dat_state <= RX_STOP;
+
+          when RX_STOP =>
+            dat0_oe  <= '0';
+            dat0_out <= '1';
+            if dat0_in = '1' then
+              ack_count <= 0;
+              dat_state <= RX_ACK;
+            end if;
 
           when RX_ACK =>
             dat0_oe  <= '1';
