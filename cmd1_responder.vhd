@@ -9,7 +9,8 @@ entity cmd1_responder is
     cmd_in    : in  std_logic;
     cmd_out   : out std_logic;
     cmd_oe    : out std_logic;
-    cmd1_seen : out std_logic
+    cmd1_seen : out std_logic;
+    ext_csd_read_req : out std_logic
   );
 end entity;
 
@@ -18,7 +19,8 @@ architecture rtl of cmd1_responder is
 
   constant C_OCR_RESPONSE : std_logic_vector(31 downto 0) := x"C0FF8000";
   constant C_CID_PAYLOAD  : std_logic_vector(119 downto 0) := x"134650474131123456789ABCDEF240";
-  constant C_R1_STATUS    : std_logic_vector(31 downto 0) := (others => '0');
+  constant C_CSD_PAYLOAD  : std_logic_vector(119 downto 0) := x"400E00325B590000123456789ABCDE";
+  constant C_R1_STATUS    : std_logic_vector(31 downto 0) := x"00000900";
 
   signal state         : state_t := IDLE;
   signal rx_shift      : std_logic_vector(47 downto 0) := (others => '1');
@@ -30,6 +32,7 @@ architecture rtl of cmd1_responder is
   signal cmd_out_reg   : std_logic := '1';
   signal cmd_oe_reg    : std_logic := '0';
   signal cmd1_seen_reg : std_logic := '0';
+  signal ext_csd_read_req_reg : std_logic := '0';
 
   function crc7_any(data : std_logic_vector) return std_logic_vector is
     variable crc : std_logic_vector(6 downto 0) := (others => '0');
@@ -56,6 +59,8 @@ begin
     variable resp136   : std_logic_vector(135 downto 0);
     variable cid_reg   : std_logic_vector(127 downto 0);
     variable cid_crc   : std_logic_vector(6 downto 0);
+    variable csd_reg   : std_logic_vector(127 downto 0);
+    variable csd_crc   : std_logic_vector(6 downto 0);
     variable r1_header : std_logic_vector(39 downto 0);
     variable r1_crc    : std_logic_vector(6 downto 0);
   begin
@@ -69,8 +74,10 @@ begin
         cmd_out_reg   <= '1';
         cmd_oe_reg    <= '0';
         cmd1_seen_reg <= '0';
+        ext_csd_read_req_reg <= '0';
       else
         cmd1_seen_reg <= '0';
+        ext_csd_read_req_reg <= '0';
 
         case state is
           when IDLE =>
@@ -147,6 +154,64 @@ begin
                 cmd_out_reg             <= resp48(47);
                 resp_cnt                <= 46;
                 state                   <= RESP_TX;
+              elsif cmd_index = to_unsigned(9, 6) then
+                csd_crc := crc7_any(C_CSD_PAYLOAD);
+                csd_reg := C_CSD_PAYLOAD & csd_crc & '1';
+
+                resp136 := (others => '1');
+                resp136(135) := '0';
+                resp136(134) := '0';
+                resp136(133 downto 128) := (others => '1');
+                resp136(127 downto 0) := csd_reg;
+
+                resp_shift  <= resp136;
+                cmd_oe_reg  <= '1';
+                cmd_out_reg <= resp136(135);
+                resp_cnt    <= 134;
+                state       <= RESP_TX;
+              elsif cmd_index = to_unsigned(13, 6) then
+                r1_header(39)           := '0';
+                r1_header(38)           := '0';
+                r1_header(37 downto 32) := std_logic_vector(cmd_index);
+                r1_header(31 downto 0)  := C_R1_STATUS;
+                r1_crc := crc7_any(r1_header);
+
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := std_logic_vector(cmd_index);
+                resp48(39 downto 8)  := C_R1_STATUS;
+                resp48(7 downto 1)   := r1_crc;
+                resp48(0)            := '1';
+
+                resp_shift              <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
+                cmd_oe_reg              <= '1';
+                cmd_out_reg             <= resp48(47);
+                resp_cnt                <= 46;
+                state                   <= RESP_TX;
+              elsif cmd_index = to_unsigned(8, 6) then
+                r1_header(39)           := '0';
+                r1_header(38)           := '0';
+                r1_header(37 downto 32) := std_logic_vector(cmd_index);
+                r1_header(31 downto 0)  := C_R1_STATUS;
+                r1_crc := crc7_any(r1_header);
+
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := std_logic_vector(cmd_index);
+                resp48(39 downto 8)  := C_R1_STATUS;
+                resp48(7 downto 1)   := r1_crc;
+                resp48(0)            := '1';
+
+                resp_shift              <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
+                cmd_oe_reg              <= '1';
+                cmd_out_reg             <= resp48(47);
+                resp_cnt                <= 46;
+                ext_csd_read_req_reg    <= '1';
+                state                   <= RESP_TX;
               else
                 state <= IDLE;
               end if;
@@ -172,4 +237,5 @@ begin
   cmd_out   <= cmd_out_reg;
   cmd_oe    <= cmd_oe_reg;
   cmd1_seen <= cmd1_seen_reg;
+  ext_csd_read_req <= ext_csd_read_req_reg;
 end architecture;
