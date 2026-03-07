@@ -18,6 +18,7 @@ architecture rtl of cmd1_responder is
 
   constant C_OCR_RESPONSE : std_logic_vector(31 downto 0) := x"C0FF8000";
   constant C_CID_PAYLOAD  : std_logic_vector(119 downto 0) := x"134650474131123456789ABCDEF240";
+  constant C_R1_STATUS    : std_logic_vector(31 downto 0) := (others => '0');
 
   signal state         : state_t := IDLE;
   signal rx_shift      : std_logic_vector(47 downto 0) := (others => '1');
@@ -50,10 +51,13 @@ begin
   process (emmc_clk)
     variable cmd_frame : std_logic_vector(47 downto 0);
     variable cmd_index : unsigned(5 downto 0);
+    variable cmd_arg   : std_logic_vector(31 downto 0);
     variable resp48    : std_logic_vector(47 downto 0);
     variable resp136   : std_logic_vector(135 downto 0);
     variable cid_reg   : std_logic_vector(127 downto 0);
     variable cid_crc   : std_logic_vector(6 downto 0);
+    variable r1_header : std_logic_vector(39 downto 0);
+    variable r1_crc    : std_logic_vector(6 downto 0);
   begin
     if rising_edge(emmc_clk) then
       if reset = '1' then
@@ -87,6 +91,7 @@ begin
 
             if rx_cnt = 47 then
               cmd_index := unsigned(cmd_frame(45 downto 40));
+              cmd_arg   := cmd_frame(39 downto 8);
 
               if cmd_index = to_unsigned(1, 6) then
                 resp48 := (others => '1');
@@ -119,6 +124,29 @@ begin
                 cmd_out_reg <= resp136(135);
                 resp_cnt    <= 134;
                 state       <= RESP_TX;
+              elsif cmd_index = to_unsigned(3, 6) then
+                -- MMC CMD3: host assigns RCA through the command argument.
+                -- For bring-up, accept the provided RCA and return a normal R1 status.
+                r1_header(39)           := '0';
+                r1_header(38)           := '0';
+                r1_header(37 downto 32) := std_logic_vector(cmd_index);
+                r1_header(31 downto 0)  := C_R1_STATUS;
+                r1_crc := crc7_any(r1_header);
+
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := std_logic_vector(cmd_index);
+                resp48(39 downto 8)  := C_R1_STATUS;
+                resp48(7 downto 1)   := r1_crc;
+                resp48(0)            := '1';
+
+                resp_shift              <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
+                cmd_oe_reg              <= '1';
+                cmd_out_reg             <= resp48(47);
+                resp_cnt                <= 46;
+                state                   <= RESP_TX;
               else
                 state <= IDLE;
               end if;
