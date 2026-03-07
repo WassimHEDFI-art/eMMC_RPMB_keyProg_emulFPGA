@@ -17,7 +17,7 @@ architecture rtl of cmd1_responder is
   type state_t is (IDLE, CMD_RX, RESP_TX);
 
   constant C_OCR_RESPONSE : std_logic_vector(31 downto 0) := x"C0FF8000";
-  constant C_CID_PAYLOAD  : std_logic_vector(119 downto 0) := x"134650474131123456789ABCDEF240325A";
+  constant C_CID_PAYLOAD  : std_logic_vector(119 downto 0) := x"134650474131123456789ABCDEF240";
 
   signal state         : state_t := IDLE;
   signal rx_shift      : std_logic_vector(47 downto 0) := (others => '1');
