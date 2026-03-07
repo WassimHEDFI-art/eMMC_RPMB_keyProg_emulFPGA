@@ -37,6 +37,7 @@ architecture rtl of emmc_slave_top is
   signal cmd1_seen_latched   : std_logic := '0';
   signal cmd8_seen_latched   : std_logic := '0';
   signal ext_csd_req_latched : std_logic := '0';
+  signal ext_csd_req_pending : std_logic := '0';
   signal dat_tx_active       : std_logic;
   signal ext_csd_read_req    : std_logic;
 
@@ -95,6 +96,7 @@ begin
         cmd1_seen_latched <= '0';
         cmd8_seen_latched <= '0';
         ext_csd_req_latched <= '0';
+        ext_csd_req_pending <= '0';
         dat_state         <= IDLE;
         dat0_out          <= '1';
         dat0_oe           <= '0';
@@ -112,13 +114,14 @@ begin
         end if;
         if ext_csd_read_req = '1' then
           ext_csd_req_latched <= '1';
+          ext_csd_req_pending <= '1';
         end if;
 
         case dat_state is
           when IDLE =>
             dat0_oe  <= '0';
             dat0_out <= '1';
-            if ext_csd_read_req = '1' then
+            if (ext_csd_req_pending = '1') and (cmd_oe = '0') then
               v_frame := (others => '0');
               -- EXT_CSD key fields used by host bring-up.
               -- Byte 192: EXT_CSD_REV
@@ -138,6 +141,7 @@ begin
               end loop;
               tx_crc16     <= v_crc16;
               wait_count   <= 0;
+              ext_csd_req_pending <= '0';
               dat_state    <= DATA_WAIT;
             end if;
 
