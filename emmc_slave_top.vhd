@@ -26,6 +26,7 @@ architecture rtl of emmc_slave_top is
   type tx_kind_t is (TX_NONE, TX_EXT_CSD, TX_RPMB);
   constant C_WRITE_ACK_TOKEN : std_logic_vector(4 downto 0) := "00101";
   constant C_RESET_HOLD_CYCLES : unsigned(15 downto 0) := to_unsigned(50000, 16);
+  constant C_IDLE_LEARN_CYCLES : unsigned(15 downto 0) := to_unsigned(50000, 16);
 
   signal reset_50            : std_logic := '1';
   signal reset_cnt           : unsigned(5 downto 0) := (others => '0');
@@ -38,6 +39,7 @@ architecture rtl of emmc_slave_top is
   signal btn_idle_valid      : std_logic := '0';
   signal btn_next_idle       : std_logic := '0';
   signal btn_restart_idle    : std_logic := '0';
+  signal idle_learn_count    : unsigned(15 downto 0) := (others => '0');
   signal combo_hold_count    : unsigned(15 downto 0) := (others => '0');
   signal manual_reset_req    : std_logic := '0';
 
@@ -111,43 +113,56 @@ begin
       btn_next_sync    <= btn_next_meta;
       btn_restart_meta <= btn_restart;
       btn_restart_sync <= btn_restart_meta;
-
-      if btn_idle_valid = '0' then
-        btn_next_idle    <= btn_next_sync;
-        btn_restart_idle <= btn_restart_sync;
-        btn_idle_valid   <= '1';
-      end if;
-
-      if btn_idle_valid = '1' then
-        if (btn_next_sync /= btn_next_idle) and (btn_restart_sync /= btn_restart_idle) then
-          v_buttons_pressed := '1';
-        else
-          v_buttons_pressed := '0';
-        end if;
-      else
-        v_buttons_pressed := '0';
-      end if;
-
-      if v_buttons_pressed = '1' then
-        if combo_hold_count < C_RESET_HOLD_CYCLES then
-          combo_hold_count <= combo_hold_count + 1;
-          manual_reset_req <= '0';
-        else
-          manual_reset_req <= '1';
-        end if;
-      else
-        combo_hold_count <= (others => '0');
-        manual_reset_req <= '0';
-      end if;
-
       if manual_reset_req = '1' then
         reset_cnt <= (others => '0');
         reset_50  <= '1';
+        btn_idle_valid   <= '0';
+        btn_next_idle    <= btn_next_sync;
+        btn_restart_idle <= btn_restart_sync;
+        idle_learn_count <= (others => '0');
+        combo_hold_count <= (others => '0');
+        manual_reset_req <= '0';
       elsif reset_cnt = to_unsigned(63, reset_cnt'length) then
         reset_50 <= '0';
+
+        if btn_idle_valid = '0' then
+          btn_next_idle    <= btn_next_sync;
+          btn_restart_idle <= btn_restart_sync;
+          combo_hold_count <= (others => '0');
+          manual_reset_req <= '0';
+          if idle_learn_count = C_IDLE_LEARN_CYCLES then
+            btn_idle_valid <= '1';
+          else
+            idle_learn_count <= idle_learn_count + 1;
+          end if;
+        else
+          if (btn_next_sync /= btn_next_idle) and (btn_restart_sync /= btn_restart_idle) then
+            v_buttons_pressed := '1';
+          else
+            v_buttons_pressed := '0';
+          end if;
+
+          if v_buttons_pressed = '1' then
+            if combo_hold_count < C_RESET_HOLD_CYCLES then
+              combo_hold_count <= combo_hold_count + 1;
+              manual_reset_req <= '0';
+            else
+              manual_reset_req <= '1';
+            end if;
+          else
+            combo_hold_count <= (others => '0');
+            manual_reset_req <= '0';
+          end if;
+        end if;
       else
         reset_cnt <= reset_cnt + 1;
         reset_50  <= '1';
+        btn_idle_valid   <= '0';
+        btn_next_idle    <= btn_next_sync;
+        btn_restart_idle <= btn_restart_sync;
+        idle_learn_count <= (others => '0');
+        combo_hold_count <= (others => '0');
+        manual_reset_req <= '0';
       end if;
     end if;
   end process;
