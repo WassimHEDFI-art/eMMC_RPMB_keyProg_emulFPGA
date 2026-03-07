@@ -78,6 +78,8 @@ architecture rtl of emmc_slave_top is
   signal rpmb_result_code    : std_logic_vector(15 downto 0);
   signal rpmb_resp_type      : std_logic_vector(15 downto 0);
   signal rpmb_req_type_last  : std_logic_vector(15 downto 0);
+  signal write_xfer_done     : std_logic := '0';
+  signal read_xfer_done      : std_logic := '0';
 begin
   cmd_in <= emmc_cmd;
   dat0_in <= emmc_dat0;
@@ -121,6 +123,8 @@ begin
       cmd18_seen  => cmd18_seen,
       cmd23_reliable => cmd23_reliable,
       block_count => block_count,
+      write_xfer_done => write_xfer_done,
+      read_xfer_done  => read_xfer_done,
       ext_csd_read_req => ext_csd_read_req,
       ext_csd_power_class => ext_csd_power_class,
       ext_csd_bus_width   => ext_csd_bus_width,
@@ -180,10 +184,14 @@ begin
         rpmb_byte_valid <= '0';
         rpmb_frame_done <= '0';
         rpmb_consume_result <= '0';
+        write_xfer_done   <= '0';
+        read_xfer_done    <= '0';
 
         if cmd1_seen = '1' then
           cmd1_seen_latched <= '1';
         end if;
+        write_xfer_done <= '0';
+        read_xfer_done  <= '0';
         if cmd8_seen = '1' then
           cmd8_seen_latched <= '1';
         end if;
@@ -300,6 +308,7 @@ begin
             dat0_out <= '1';
             if tx_kind = TX_RPMB then
               rpmb_consume_result <= '1';
+              read_xfer_done <= '1';
             end if;
             tx_kind   <= TX_NONE;
             dat_state <= IDLE;
@@ -350,6 +359,7 @@ begin
             dat0_oe  <= '0';
             dat0_out <= '1';
             rpmb_frame_done <= '1';
+            write_xfer_done <= '1';
             dat_state <= IDLE;
         end case;
       end if;

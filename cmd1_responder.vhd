@@ -16,6 +16,8 @@ entity cmd1_responder is
     cmd18_seen : out std_logic;
     cmd23_reliable : out std_logic;
     block_count : out std_logic_vector(15 downto 0);
+    write_xfer_done : in  std_logic;
+    read_xfer_done  : in  std_logic;
     ext_csd_read_req : out std_logic;
     ext_csd_power_class : out std_logic_vector(7 downto 0);
     ext_csd_bus_width   : out std_logic_vector(7 downto 0);
@@ -50,6 +52,7 @@ architecture rtl of cmd1_responder is
   signal ext_csd_read_req_reg : std_logic := '0';
   signal rca_reg              : std_logic_vector(15 downto 0) := x"0002";
   signal selected_reg         : std_logic := '0';
+  signal card_state_reg       : std_logic_vector(3 downto 0) := std_logic_vector(to_unsigned(3, 4));
   signal ext_csd_power_class_reg : std_logic_vector(7 downto 0) := x"00";
   signal ext_csd_bus_width_reg   : std_logic_vector(7 downto 0) := x"00";
   signal ext_csd_hs_timing_reg   : std_logic_vector(7 downto 0) := x"00";
@@ -71,15 +74,11 @@ architecture rtl of cmd1_responder is
     return crc;
   end function;
 
-  function make_r1_status(selected : std_logic) return std_logic_vector is
+  function make_r1_status(state_code : std_logic_vector(3 downto 0); ready_for_data : std_logic) return std_logic_vector is
     variable status : std_logic_vector(31 downto 0) := (others => '0');
   begin
-    status(8) := '1'; -- READY_FOR_DATA
-    if selected = '1' then
-      status(12 downto 9) := std_logic_vector(to_unsigned(4, 4)); -- TRANSFER
-    else
-      status(12 downto 9) := std_logic_vector(to_unsigned(3, 4)); -- STANDBY
-    end if;
+    status(8) := ready_for_data;
+    status(12 downto 9) := state_code;
     return status;
   end function;
 begin
@@ -116,6 +115,7 @@ begin
         ext_csd_read_req_reg <= '0';
         rca_reg <= x"0002";
         selected_reg <= '0';
+        card_state_reg <= std_logic_vector(to_unsigned(3, 4));
         ext_csd_power_class_reg <= x"00";
         ext_csd_bus_width_reg <= x"00";
         ext_csd_hs_timing_reg <= x"00";
@@ -126,6 +126,14 @@ begin
         cmd25_seen_reg <= '0';
         cmd18_seen_reg <= '0';
         ext_csd_read_req_reg <= '0';
+
+        if selected_reg = '1' then
+          if (write_xfer_done = '1') or (read_xfer_done = '1') then
+            card_state_reg <= std_logic_vector(to_unsigned(4, 4)); -- TRANSFER
+          end if;
+        else
+          card_state_reg <= std_logic_vector(to_unsigned(3, 4)); -- STANDBY
+        end if;
 
         case state is
           when IDLE =>
@@ -184,7 +192,7 @@ begin
                 if cmd_arg(31 downto 16) /= x"0000" then
                   rca_reg <= cmd_arg(31 downto 16);
                 end if;
-                r1_status := make_r1_status(selected_reg);
+                r1_status := make_r1_status(card_state_reg, '1');
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
@@ -221,7 +229,7 @@ begin
                 resp_cnt    <= 134;
                 state       <= RESP_TX;
               elsif cmd_index = to_unsigned(13, 6) then
-                r1_status := make_r1_status(selected_reg);
+                r1_status := make_r1_status(card_state_reg, '1');
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
@@ -245,7 +253,7 @@ begin
               elsif cmd_index = to_unsigned(16, 6) then
                 -- MMC CMD16: SET_BLOCKLEN.
                 -- Accept the requested block size for bring-up and acknowledge with R1.
-                r1_status := make_r1_status(selected_reg);
+                r1_status := make_r1_status(card_state_reg, '1');
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
@@ -271,7 +279,7 @@ begin
                 cmd23_reliable_reg <= cmd_arg(31);
                 cmd23_seen_reg <= '1';
 
-                r1_status := make_r1_status(selected_reg);
+                r1_status := make_r1_status(card_state_reg, '1');
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
@@ -294,8 +302,9 @@ begin
                 state                   <= RESP_TX;
               elsif cmd_index = to_unsigned(25, 6) then
                 cmd25_seen_reg <= '1';
+                card_state_reg <= std_logic_vector(to_unsigned(6, 4)); -- RECEIVE
 
-                r1_status := make_r1_status(selected_reg);
+                r1_status := make_r1_status(std_logic_vector(to_unsigned(6, 4)), '1');
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
@@ -318,8 +327,9 @@ begin
                 state                   <= RESP_TX;
               elsif cmd_index = to_unsigned(18, 6) then
                 cmd18_seen_reg <= '1';
+                card_state_reg <= std_logic_vector(to_unsigned(5, 4)); -- DATA
 
-                r1_status := make_r1_status(selected_reg);
+                r1_status := make_r1_status(std_logic_vector(to_unsigned(5, 4)), '1');
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
@@ -343,10 +353,12 @@ begin
               elsif cmd_index = to_unsigned(7, 6) then
                 if cmd_arg(31 downto 16) = x"0000" then
                   selected_reg <= '0';
-                  r1_status := make_r1_status('0');
+                  card_state_reg <= std_logic_vector(to_unsigned(3, 4)); -- STANDBY
+                  r1_status := make_r1_status(std_logic_vector(to_unsigned(3, 4)), '1');
                 else
                   selected_reg <= '1';
-                  r1_status := make_r1_status('1');
+                  card_state_reg <= std_logic_vector(to_unsigned(4, 4)); -- TRANSFER
+                  r1_status := make_r1_status(std_logic_vector(to_unsigned(4, 4)), '1');
                 end if;
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
@@ -369,7 +381,7 @@ begin
                 resp_cnt                <= 46;
                 state                   <= RESP_TX;
               elsif cmd_index = to_unsigned(8, 6) then
-                r1_status := make_r1_status(selected_reg);
+                r1_status := make_r1_status(card_state_reg, '1');
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
@@ -407,7 +419,7 @@ begin
                   end case;
                 end if;
 
-                r1_status := make_r1_status(selected_reg);
+                r1_status := make_r1_status(card_state_reg, '1');
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
