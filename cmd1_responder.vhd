@@ -11,7 +11,10 @@ entity cmd1_responder is
     cmd_oe    : out std_logic;
     cmd1_seen : out std_logic;
     cmd8_seen : out std_logic;
-    ext_csd_read_req : out std_logic
+    ext_csd_read_req : out std_logic;
+    ext_csd_power_class : out std_logic_vector(7 downto 0);
+    ext_csd_bus_width   : out std_logic_vector(7 downto 0);
+    ext_csd_hs_timing   : out std_logic_vector(7 downto 0)
   );
 end entity;
 
@@ -35,6 +38,11 @@ architecture rtl of cmd1_responder is
   signal cmd1_seen_reg : std_logic := '0';
   signal cmd8_seen_reg : std_logic := '0';
   signal ext_csd_read_req_reg : std_logic := '0';
+  signal rca_reg              : std_logic_vector(15 downto 0) := x"0002";
+  signal selected_reg         : std_logic := '0';
+  signal ext_csd_power_class_reg : std_logic_vector(7 downto 0) := x"00";
+  signal ext_csd_bus_width_reg   : std_logic_vector(7 downto 0) := x"00";
+  signal ext_csd_hs_timing_reg   : std_logic_vector(7 downto 0) := x"00";
 
   function crc7_any(data : std_logic_vector) return std_logic_vector is
     variable crc : std_logic_vector(6 downto 0) := (others => '0');
@@ -52,6 +60,18 @@ architecture rtl of cmd1_responder is
     end loop;
     return crc;
   end function;
+
+  function make_r1_status(selected : std_logic) return std_logic_vector is
+    variable status : std_logic_vector(31 downto 0) := (others => '0');
+  begin
+    status(8) := '1'; -- READY_FOR_DATA
+    if selected = '1' then
+      status(12 downto 9) := std_logic_vector(to_unsigned(4, 4)); -- TRANSFER
+    else
+      status(12 downto 9) := std_logic_vector(to_unsigned(3, 4)); -- STANDBY
+    end if;
+    return status;
+  end function;
 begin
   process (emmc_clk)
     variable cmd_frame : std_logic_vector(47 downto 0);
@@ -65,6 +85,7 @@ begin
     variable csd_crc   : std_logic_vector(6 downto 0);
     variable r1_header : std_logic_vector(39 downto 0);
     variable r1_crc    : std_logic_vector(6 downto 0);
+    variable r1_status : std_logic_vector(31 downto 0);
   begin
     if rising_edge(emmc_clk) then
       if reset = '1' then
@@ -78,6 +99,11 @@ begin
         cmd1_seen_reg <= '0';
         cmd8_seen_reg <= '0';
         ext_csd_read_req_reg <= '0';
+        rca_reg <= x"0002";
+        selected_reg <= '0';
+        ext_csd_power_class_reg <= x"00";
+        ext_csd_bus_width_reg <= x"00";
+        ext_csd_hs_timing_reg <= x"00";
       else
         cmd1_seen_reg <= '0';
         cmd8_seen_reg <= '0';
@@ -137,18 +163,21 @@ begin
                 state       <= RESP_TX;
               elsif cmd_index = to_unsigned(3, 6) then
                 -- MMC CMD3: host assigns RCA through the command argument.
-                -- For bring-up, accept the provided RCA and return a normal R1 status.
+                if cmd_arg(31 downto 16) /= x"0000" then
+                  rca_reg <= cmd_arg(31 downto 16);
+                end if;
+                r1_status := make_r1_status(selected_reg);
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
-                r1_header(31 downto 0)  := C_R1_STATUS;
+                r1_header(31 downto 0)  := r1_status;
                 r1_crc := crc7_any(r1_header);
 
                 resp48 := (others => '1');
                 resp48(47) := '0';
                 resp48(46) := '0';
                 resp48(45 downto 40) := std_logic_vector(cmd_index);
-                resp48(39 downto 8)  := C_R1_STATUS;
+                resp48(39 downto 8)  := r1_status;
                 resp48(7 downto 1)   := r1_crc;
                 resp48(0)            := '1';
 
@@ -174,17 +203,18 @@ begin
                 resp_cnt    <= 134;
                 state       <= RESP_TX;
               elsif cmd_index = to_unsigned(13, 6) then
+                r1_status := make_r1_status(selected_reg);
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
-                r1_header(31 downto 0)  := C_R1_STATUS;
+                r1_header(31 downto 0)  := r1_status;
                 r1_crc := crc7_any(r1_header);
 
                 resp48 := (others => '1');
                 resp48(47) := '0';
                 resp48(46) := '0';
                 resp48(45 downto 40) := std_logic_vector(cmd_index);
-                resp48(39 downto 8)  := C_R1_STATUS;
+                resp48(39 downto 8)  := r1_status;
                 resp48(7 downto 1)   := r1_crc;
                 resp48(0)            := '1';
 
@@ -195,19 +225,24 @@ begin
                 resp_cnt                <= 46;
                 state                   <= RESP_TX;
               elsif cmd_index = to_unsigned(7, 6) then
-                -- MMC CMD7: select/deselect the addressed card.
-                -- For bring-up, acknowledge with a normal R1 status.
+                if cmd_arg(31 downto 16) = x"0000" then
+                  selected_reg <= '0';
+                  r1_status := make_r1_status('0');
+                else
+                  selected_reg <= '1';
+                  r1_status := make_r1_status('1');
+                end if;
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
-                r1_header(31 downto 0)  := C_R1_STATUS;
+                r1_header(31 downto 0)  := r1_status;
                 r1_crc := crc7_any(r1_header);
 
                 resp48 := (others => '1');
                 resp48(47) := '0';
                 resp48(46) := '0';
                 resp48(45 downto 40) := std_logic_vector(cmd_index);
-                resp48(39 downto 8)  := C_R1_STATUS;
+                resp48(39 downto 8)  := r1_status;
                 resp48(7 downto 1)   := r1_crc;
                 resp48(0)            := '1';
 
@@ -218,17 +253,18 @@ begin
                 resp_cnt                <= 46;
                 state                   <= RESP_TX;
               elsif cmd_index = to_unsigned(8, 6) then
+                r1_status := make_r1_status(selected_reg);
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
                 r1_header(37 downto 32) := std_logic_vector(cmd_index);
-                r1_header(31 downto 0)  := C_R1_STATUS;
+                r1_header(31 downto 0)  := r1_status;
                 r1_crc := crc7_any(r1_header);
 
                 resp48 := (others => '1');
                 resp48(47) := '0';
                 resp48(46) := '0';
                 resp48(45 downto 40) := std_logic_vector(cmd_index);
-                resp48(39 downto 8)  := C_R1_STATUS;
+                resp48(39 downto 8)  := r1_status;
                 resp48(7 downto 1)   := r1_crc;
                 resp48(0)            := '1';
 
@@ -239,6 +275,42 @@ begin
                 resp_cnt                <= 46;
                 cmd8_seen_reg           <= '1';
                 ext_csd_read_req_reg    <= '1';
+                state                   <= RESP_TX;
+              elsif cmd_index = to_unsigned(6, 6) then
+                -- MMC CMD6: SWITCH to write EXT_CSD bytes.
+                if cmd_arg(25 downto 24) = "11" then
+                  case cmd_arg(23 downto 16) is
+                    when x"BB" =>
+                      ext_csd_power_class_reg <= cmd_arg(15 downto 8);
+                    when x"B7" =>
+                      ext_csd_bus_width_reg <= cmd_arg(15 downto 8);
+                    when x"B9" =>
+                      ext_csd_hs_timing_reg <= cmd_arg(15 downto 8);
+                    when others =>
+                      null;
+                  end case;
+                end if;
+
+                r1_status := make_r1_status(selected_reg);
+                r1_header(39)           := '0';
+                r1_header(38)           := '0';
+                r1_header(37 downto 32) := std_logic_vector(cmd_index);
+                r1_header(31 downto 0)  := r1_status;
+                r1_crc := crc7_any(r1_header);
+
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := std_logic_vector(cmd_index);
+                resp48(39 downto 8)  := r1_status;
+                resp48(7 downto 1)   := r1_crc;
+                resp48(0)            := '1';
+
+                resp_shift              <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
+                cmd_oe_reg              <= '1';
+                cmd_out_reg             <= resp48(47);
+                resp_cnt                <= 46;
                 state                   <= RESP_TX;
               else
                 state <= IDLE;
@@ -267,4 +339,7 @@ begin
   cmd1_seen <= cmd1_seen_reg;
   cmd8_seen <= cmd8_seen_reg;
   ext_csd_read_req <= ext_csd_read_req_reg;
+  ext_csd_power_class <= ext_csd_power_class_reg;
+  ext_csd_bus_width   <= ext_csd_bus_width_reg;
+  ext_csd_hs_timing   <= ext_csd_hs_timing_reg;
 end architecture;

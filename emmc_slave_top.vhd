@@ -40,6 +40,9 @@ architecture rtl of emmc_slave_top is
   signal ext_csd_req_pending : std_logic := '0';
   signal dat_tx_active       : std_logic;
   signal ext_csd_read_req    : std_logic;
+  signal ext_csd_power_class : std_logic_vector(7 downto 0);
+  signal ext_csd_bus_width   : std_logic_vector(7 downto 0);
+  signal ext_csd_hs_timing   : std_logic_vector(7 downto 0);
 
   signal dat_state           : dat_state_t := IDLE;
   signal dat0_out            : std_logic := '1';
@@ -84,7 +87,10 @@ begin
       cmd_oe      => cmd_oe,
       cmd1_seen   => cmd1_seen,
       cmd8_seen   => cmd8_seen,
-      ext_csd_read_req => ext_csd_read_req
+      ext_csd_read_req => ext_csd_read_req,
+      ext_csd_power_class => ext_csd_power_class,
+      ext_csd_bus_width   => ext_csd_bus_width,
+      ext_csd_hs_timing   => ext_csd_hs_timing
     );
 
   process (emmc_clk)
@@ -124,11 +130,21 @@ begin
             if (ext_csd_req_pending = '1') and (cmd_oe = '0') then
               v_frame := (others => '0');
               -- EXT_CSD key fields used by host bring-up.
+              -- Byte 183: BUS_WIDTH
+              -- Byte 185: HS_TIMING
+              -- Byte 187: POWER_CLASS
               -- Byte 192: EXT_CSD_REV
               -- Byte 196: CARD_TYPE
+              -- Byte 202/203/239: supported power-class fields
               -- Bytes 212..215: SEC_COUNT (little-endian)
+              v_frame((511 - 183) * 8 + 7 downto (511 - 183) * 8) := ext_csd_bus_width;
+              v_frame((511 - 185) * 8 + 7 downto (511 - 185) * 8) := ext_csd_hs_timing;
+              v_frame((511 - 187) * 8 + 7 downto (511 - 187) * 8) := ext_csd_power_class;
               v_frame((511 - 192) * 8 + 7 downto (511 - 192) * 8) := x"08";
               v_frame((511 - 196) * 8 + 7 downto (511 - 196) * 8) := x"01";
+              v_frame((511 - 202) * 8 + 7 downto (511 - 202) * 8) := x"00";
+              v_frame((511 - 203) * 8 + 7 downto (511 - 203) * 8) := x"00";
+              v_frame((511 - 239) * 8 + 7 downto (511 - 239) * 8) := x"00";
               v_frame((511 - 212) * 8 + 7 downto (511 - 212) * 8) := x"00";
               v_frame((511 - 213) * 8 + 7 downto (511 - 213) * 8) := x"00";
               v_frame((511 - 214) * 8 + 7 downto (511 - 214) * 8) := x"01";
