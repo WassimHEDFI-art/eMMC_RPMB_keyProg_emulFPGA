@@ -22,7 +22,7 @@ entity emmc_slave_top is
 end entity;
 
 architecture rtl of emmc_slave_top is
-  type dat_state_t is (IDLE, TX_WAIT, TX_START, TX_DATA, TX_CRC, TX_END, RX_WAIT, RX_DATA, RX_CRC, RX_END);
+  type dat_state_t is (IDLE, TX_WAIT, TX_START, TX_DATA, TX_CRC, TX_END, RX_WAIT, RX_DATA, RX_CRC, RX_END, RX_BUSY, RX_BUSY_END);
   type tx_kind_t is (TX_NONE, TX_EXT_CSD, TX_RPMB);
 
   signal reset_50            : std_logic := '1';
@@ -66,6 +66,7 @@ architecture rtl of emmc_slave_top is
   signal rx_subbit_count     : integer range 0 to 7 := 0;
   signal rx_byte_shift       : std_logic_vector(7 downto 0) := (others => '0');
   signal wait_count          : integer range 0 to 31 := 0;
+  signal busy_count          : integer range 0 to 63 := 0;
 
   signal rpmb_frame_active   : std_logic;
   signal rpmb_byte_valid     : std_logic := '0';
@@ -192,6 +193,7 @@ begin
         rx_subbit_count   <= 0;
         rx_byte_shift     <= (others => '0');
         wait_count        <= 0;
+        busy_count        <= 0;
         rpmb_byte_valid   <= '0';
         rpmb_byte_in      <= (others => '0');
         rpmb_frame_done   <= '0';
@@ -265,6 +267,7 @@ begin
               rx_crc_count    <= 0;
               rx_subbit_count <= 0;
               rx_byte_shift   <= (others => '0');
+              busy_count      <= 0;
               dat_state       <= RX_WAIT;
             elsif (cmd18_pending = '1') and (block_count = x"0001") and (rpmb_result_ready = '1') and (cmd_oe = '0') then
               v_frame := (others => '0');
@@ -375,6 +378,21 @@ begin
             dat0_oe  <= '0';
             dat0_out <= '1';
             rpmb_frame_done <= '1';
+            busy_count <= 0;
+            dat_state <= RX_BUSY;
+
+          when RX_BUSY =>
+            dat0_oe  <= '1';
+            dat0_out <= '0';
+            if busy_count = 31 then
+              dat_state <= RX_BUSY_END;
+            else
+              busy_count <= busy_count + 1;
+            end if;
+
+          when RX_BUSY_END =>
+            dat0_oe  <= '0';
+            dat0_out <= '1';
             write_xfer_done <= '1';
             dat_state <= IDLE;
         end case;
