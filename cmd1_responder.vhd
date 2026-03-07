@@ -17,22 +17,43 @@ architecture rtl of cmd1_responder is
   type state_t is (IDLE, CMD_RX, RESP_TX);
 
   constant C_OCR_RESPONSE : std_logic_vector(31 downto 0) := x"C0FF8000";
+  constant C_CID_PAYLOAD  : std_logic_vector(119 downto 0) := x"134650474131123456789ABCDEF240325A";
 
   signal state         : state_t := IDLE;
   signal rx_shift      : std_logic_vector(47 downto 0) := (others => '1');
   signal rx_cnt        : integer range 0 to 47 := 0;
 
-  signal resp_shift    : std_logic_vector(47 downto 0) := (others => '1');
-  signal resp_cnt      : integer range 0 to 47 := 0;
+  signal resp_shift    : std_logic_vector(135 downto 0) := (others => '1');
+  signal resp_cnt      : integer range 0 to 135 := 0;
 
   signal cmd_out_reg   : std_logic := '1';
   signal cmd_oe_reg    : std_logic := '0';
   signal cmd1_seen_reg : std_logic := '0';
+
+  function crc7_any(data : std_logic_vector) return std_logic_vector is
+    variable crc : std_logic_vector(6 downto 0) := (others => '0');
+    variable fb  : std_logic;
+  begin
+    for i in data'range loop
+      fb := data(i) xor crc(6);
+      crc(6) := crc(5);
+      crc(5) := crc(4);
+      crc(4) := crc(3);
+      crc(3) := crc(2) xor fb;
+      crc(2) := crc(1);
+      crc(1) := crc(0);
+      crc(0) := fb;
+    end loop;
+    return crc;
+  end function;
 begin
   process (emmc_clk)
     variable cmd_frame : std_logic_vector(47 downto 0);
     variable cmd_index : unsigned(5 downto 0);
-    variable resp      : std_logic_vector(47 downto 0);
+    variable resp48    : std_logic_vector(47 downto 0);
+    variable resp136   : std_logic_vector(135 downto 0);
+    variable cid_reg   : std_logic_vector(127 downto 0);
+    variable cid_crc   : std_logic_vector(6 downto 0);
   begin
     if rising_edge(emmc_clk) then
       if reset = '1' then
@@ -68,20 +89,36 @@ begin
               cmd_index := unsigned(cmd_frame(45 downto 40));
 
               if cmd_index = to_unsigned(1, 6) then
-                resp := (others => '1');
-                resp(47) := '0';
-                resp(46) := '0';
-                resp(45 downto 40) := (others => '0');
-                resp(39 downto 8)  := C_OCR_RESPONSE;
-                resp(7 downto 1)   := (others => '1');
-                resp(0)            := '1';
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := (others => '0');
+                resp48(39 downto 8)  := C_OCR_RESPONSE;
+                resp48(7 downto 1)   := (others => '1');
+                resp48(0)            := '1';
 
-                resp_shift    <= resp;
+                resp_shift            <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
                 cmd_oe_reg    <= '1';
-                cmd_out_reg   <= resp(47);
+                cmd_out_reg   <= resp48(47);
                 resp_cnt      <= 46;
                 cmd1_seen_reg <= '1';
                 state         <= RESP_TX;
+              elsif cmd_index = to_unsigned(2, 6) then
+                cid_crc := crc7_any(C_CID_PAYLOAD);
+                cid_reg := C_CID_PAYLOAD & cid_crc & '1';
+
+                resp136 := (others => '1');
+                resp136(135) := '0';
+                resp136(134) := '0';
+                resp136(133 downto 128) := (others => '1');
+                resp136(127 downto 0) := cid_reg;
+
+                resp_shift  <= resp136;
+                cmd_oe_reg  <= '1';
+                cmd_out_reg <= resp136(135);
+                resp_cnt    <= 134;
+                state       <= RESP_TX;
               else
                 state <= IDLE;
               end if;
