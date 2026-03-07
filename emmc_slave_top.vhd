@@ -411,8 +411,10 @@ begin
             dat0_oe  <= '1';
             dat0_out <= C_WRITE_ACK_TOKEN(4 - ack_count);
             if ack_count = 4 then
-              busy_count <= 0;
-              dat_state <= RX_BUSY;
+              dat0_oe <= '0';
+              dat0_out <= '1';
+              write_xfer_done <= '1';
+              dat_state <= IDLE;
             else
               ack_count <= ack_count + 1;
             end if;
