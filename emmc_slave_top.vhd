@@ -33,7 +33,10 @@ architecture rtl of emmc_slave_top is
   signal cmd_out             : std_logic;
   signal cmd_oe              : std_logic;
   signal cmd1_seen           : std_logic;
+  signal cmd8_seen           : std_logic;
   signal cmd1_seen_latched   : std_logic := '0';
+  signal cmd8_seen_latched   : std_logic := '0';
+  signal ext_csd_req_latched : std_logic := '0';
   signal ext_csd_read_req    : std_logic;
 
   signal dat_state           : dat_state_t := IDLE;
@@ -78,6 +81,7 @@ begin
       cmd_out     => cmd_out,
       cmd_oe      => cmd_oe,
       cmd1_seen   => cmd1_seen,
+      cmd8_seen   => cmd8_seen,
       ext_csd_read_req => ext_csd_read_req
     );
 
@@ -88,6 +92,8 @@ begin
     if rising_edge(emmc_clk) then
       if reset_sync_1 = '1' then
         cmd1_seen_latched <= '0';
+        cmd8_seen_latched <= '0';
+        ext_csd_req_latched <= '0';
         dat_state         <= IDLE;
         dat0_out          <= '1';
         dat0_oe           <= '0';
@@ -99,6 +105,12 @@ begin
       else
         if cmd1_seen = '1' then
           cmd1_seen_latched <= '1';
+        end if;
+        if cmd8_seen = '1' then
+          cmd8_seen_latched <= '1';
+        end if;
+        if ext_csd_read_req = '1' then
+          ext_csd_req_latched <= '1';
         end if;
 
         case dat_state is
@@ -168,7 +180,11 @@ begin
     end if;
   end process;
 
-  ledr <= (9 downto 1 => '0') & cmd1_seen_latched;
+    ledr <= (9 downto 4 => '0')
+      & ('1' when dat_state /= IDLE else '0')
+      & ext_csd_req_latched
+      & cmd8_seen_latched
+      & cmd1_seen_latched;
   hex0 <= "1111111";
   hex1 <= "1111111";
   hex2 <= "1111111";

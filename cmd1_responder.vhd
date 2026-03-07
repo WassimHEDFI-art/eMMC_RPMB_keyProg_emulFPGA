@@ -10,6 +10,7 @@ entity cmd1_responder is
     cmd_out   : out std_logic;
     cmd_oe    : out std_logic;
     cmd1_seen : out std_logic;
+    cmd8_seen : out std_logic;
     ext_csd_read_req : out std_logic
   );
 end entity;
@@ -32,6 +33,7 @@ architecture rtl of cmd1_responder is
   signal cmd_out_reg   : std_logic := '1';
   signal cmd_oe_reg    : std_logic := '0';
   signal cmd1_seen_reg : std_logic := '0';
+  signal cmd8_seen_reg : std_logic := '0';
   signal ext_csd_read_req_reg : std_logic := '0';
 
   function crc7_any(data : std_logic_vector) return std_logic_vector is
@@ -74,9 +76,11 @@ begin
         cmd_out_reg   <= '1';
         cmd_oe_reg    <= '0';
         cmd1_seen_reg <= '0';
+        cmd8_seen_reg <= '0';
         ext_csd_read_req_reg <= '0';
       else
         cmd1_seen_reg <= '0';
+        cmd8_seen_reg <= '0';
         ext_csd_read_req_reg <= '0';
 
         case state is
@@ -233,6 +237,7 @@ begin
                 cmd_oe_reg              <= '1';
                 cmd_out_reg             <= resp48(47);
                 resp_cnt                <= 46;
+                cmd8_seen_reg           <= '1';
                 ext_csd_read_req_reg    <= '1';
                 state                   <= RESP_TX;
               else
@@ -260,5 +265,6 @@ begin
   cmd_out   <= cmd_out_reg;
   cmd_oe    <= cmd_oe_reg;
   cmd1_seen <= cmd1_seen_reg;
+  cmd8_seen <= cmd8_seen_reg;
   ext_csd_read_req <= ext_csd_read_req_reg;
 end architecture;
