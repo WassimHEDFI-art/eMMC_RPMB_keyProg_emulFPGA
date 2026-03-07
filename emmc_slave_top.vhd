@@ -150,6 +150,22 @@ begin
       req_type_last  => rpmb_req_type_last
     );
 
+  u_key_display_7seg : entity work.key_display_7seg
+    port map (
+      clk            => clk_50MHz,
+      reset          => reset_50,
+      key_programmed => rpmb_key_programmed,
+      key_value      => rpmb_programmed_key,
+      btn_next       => btn_next,
+      btn_restart    => btn_restart,
+      hex0           => hex0,
+      hex1           => hex1,
+      hex2           => hex2,
+      hex3           => hex3,
+      hex4           => hex4,
+      hex5           => hex5
+    );
+
   process (emmc_clk)
     variable v_frame : std_logic_vector(4095 downto 0);
     variable v_crc16 : std_logic_vector(15 downto 0);
@@ -374,10 +390,4 @@ begin
     & ext_csd_req_latched
     & cmd8_seen_latched
     & cmd1_seen_latched;
-  hex0 <= "1111111";
-  hex1 <= "1111111";
-  hex2 <= "1111111";
-  hex3 <= "1111111";
-  hex4 <= "1111111";
-  hex5 <= "1111111";
 end architecture;
