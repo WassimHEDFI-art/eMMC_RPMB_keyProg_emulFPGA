@@ -190,6 +190,29 @@ begin
                 cmd_out_reg             <= resp48(47);
                 resp_cnt                <= 46;
                 state                   <= RESP_TX;
+              elsif cmd_index = to_unsigned(7, 6) then
+                -- MMC CMD7: select/deselect the addressed card.
+                -- For bring-up, acknowledge with a normal R1 status.
+                r1_header(39)           := '0';
+                r1_header(38)           := '0';
+                r1_header(37 downto 32) := std_logic_vector(cmd_index);
+                r1_header(31 downto 0)  := C_R1_STATUS;
+                r1_crc := crc7_any(r1_header);
+
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := std_logic_vector(cmd_index);
+                resp48(39 downto 8)  := C_R1_STATUS;
+                resp48(7 downto 1)   := r1_crc;
+                resp48(0)            := '1';
+
+                resp_shift              <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
+                cmd_oe_reg              <= '1';
+                cmd_out_reg             <= resp48(47);
+                resp_cnt                <= 46;
+                state                   <= RESP_TX;
               elsif cmd_index = to_unsigned(8, 6) then
                 r1_header(39)           := '0';
                 r1_header(38)           := '0';
