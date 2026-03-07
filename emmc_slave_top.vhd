@@ -37,6 +37,7 @@ architecture rtl of emmc_slave_top is
   signal cmd1_seen_latched   : std_logic := '0';
   signal cmd8_seen_latched   : std_logic := '0';
   signal ext_csd_req_latched : std_logic := '0';
+  signal dat_tx_active       : std_logic;
   signal ext_csd_read_req    : std_logic;
 
   signal dat_state           : dat_state_t := IDLE;
@@ -180,11 +181,13 @@ begin
     end if;
   end process;
 
-    ledr <= (9 downto 4 => '0')
-      & ('1' when dat_state /= IDLE else '0')
-      & ext_csd_req_latched
-      & cmd8_seen_latched
-      & cmd1_seen_latched;
+  dat_tx_active <= '1' when dat_state /= IDLE else '0';
+
+  ledr <= (9 downto 4 => '0')
+    & dat_tx_active
+    & ext_csd_req_latched
+    & cmd8_seen_latched
+    & cmd1_seen_latched;
   hex0 <= "1111111";
   hex1 <= "1111111";
   hex2 <= "1111111";
