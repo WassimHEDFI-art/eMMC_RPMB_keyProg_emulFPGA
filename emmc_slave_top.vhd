@@ -420,7 +420,7 @@ begin
           when RX_BUSY =>
             dat0_oe  <= '1';
             dat0_out <= '0';
-            if busy_count = 31 then
+            if busy_count = 3 then
               dat_state <= RX_BUSY_END;
             else
               busy_count <= busy_count + 1;
