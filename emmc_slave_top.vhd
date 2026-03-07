@@ -345,9 +345,6 @@ begin
               rx_bit_count    <= 0;
               rx_subbit_count <= 0;
               rx_byte_shift   <= (others => '0');
-              if rpmb_key_programmed = '1' then
-                second_write_start_latched <= '1';
-              end if;
               dat_state       <= RX_DATA;
             end if;
 
@@ -368,6 +365,9 @@ begin
             end if;
 
             if rx_bit_count = 4095 then
+              if rpmb_key_programmed = '1' then
+                second_write_start_latched <= '1';
+              end if;
               rx_crc_count <= 0;
               dat_state    <= RX_CRC;
             else
