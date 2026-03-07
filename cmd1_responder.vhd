@@ -224,6 +224,30 @@ begin
                 cmd_out_reg             <= resp48(47);
                 resp_cnt                <= 46;
                 state                   <= RESP_TX;
+              elsif cmd_index = to_unsigned(16, 6) then
+                -- MMC CMD16: SET_BLOCKLEN.
+                -- Accept the requested block size for bring-up and acknowledge with R1.
+                r1_status := make_r1_status(selected_reg);
+                r1_header(39)           := '0';
+                r1_header(38)           := '0';
+                r1_header(37 downto 32) := std_logic_vector(cmd_index);
+                r1_header(31 downto 0)  := r1_status;
+                r1_crc := crc7_any(r1_header);
+
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := std_logic_vector(cmd_index);
+                resp48(39 downto 8)  := r1_status;
+                resp48(7 downto 1)   := r1_crc;
+                resp48(0)            := '1';
+
+                resp_shift              <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
+                cmd_oe_reg              <= '1';
+                cmd_out_reg             <= resp48(47);
+                resp_cnt                <= 46;
+                state                   <= RESP_TX;
               elsif cmd_index = to_unsigned(7, 6) then
                 if cmd_arg(31 downto 16) = x"0000" then
                   selected_reg <= '0';
