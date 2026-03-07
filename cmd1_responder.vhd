@@ -11,6 +11,11 @@ entity cmd1_responder is
     cmd_oe    : out std_logic;
     cmd1_seen : out std_logic;
     cmd8_seen : out std_logic;
+    cmd23_seen : out std_logic;
+    cmd25_seen : out std_logic;
+    cmd18_seen : out std_logic;
+    cmd23_reliable : out std_logic;
+    block_count : out std_logic_vector(15 downto 0);
     ext_csd_read_req : out std_logic;
     ext_csd_power_class : out std_logic_vector(7 downto 0);
     ext_csd_bus_width   : out std_logic_vector(7 downto 0);
@@ -37,6 +42,11 @@ architecture rtl of cmd1_responder is
   signal cmd_oe_reg    : std_logic := '0';
   signal cmd1_seen_reg : std_logic := '0';
   signal cmd8_seen_reg : std_logic := '0';
+  signal cmd23_seen_reg : std_logic := '0';
+  signal cmd25_seen_reg : std_logic := '0';
+  signal cmd18_seen_reg : std_logic := '0';
+  signal cmd23_reliable_reg : std_logic := '0';
+  signal block_count_reg : std_logic_vector(15 downto 0) := (others => '0');
   signal ext_csd_read_req_reg : std_logic := '0';
   signal rca_reg              : std_logic_vector(15 downto 0) := x"0002";
   signal selected_reg         : std_logic := '0';
@@ -98,6 +108,11 @@ begin
         cmd_oe_reg    <= '0';
         cmd1_seen_reg <= '0';
         cmd8_seen_reg <= '0';
+        cmd23_seen_reg <= '0';
+        cmd25_seen_reg <= '0';
+        cmd18_seen_reg <= '0';
+        cmd23_reliable_reg <= '0';
+        block_count_reg <= (others => '0');
         ext_csd_read_req_reg <= '0';
         rca_reg <= x"0002";
         selected_reg <= '0';
@@ -107,6 +122,9 @@ begin
       else
         cmd1_seen_reg <= '0';
         cmd8_seen_reg <= '0';
+        cmd23_seen_reg <= '0';
+        cmd25_seen_reg <= '0';
+        cmd18_seen_reg <= '0';
         ext_csd_read_req_reg <= '0';
 
         case state is
@@ -248,6 +266,80 @@ begin
                 cmd_out_reg             <= resp48(47);
                 resp_cnt                <= 46;
                 state                   <= RESP_TX;
+              elsif cmd_index = to_unsigned(23, 6) then
+                block_count_reg <= cmd_arg(15 downto 0);
+                cmd23_reliable_reg <= cmd_arg(31);
+                cmd23_seen_reg <= '1';
+
+                r1_status := make_r1_status(selected_reg);
+                r1_header(39)           := '0';
+                r1_header(38)           := '0';
+                r1_header(37 downto 32) := std_logic_vector(cmd_index);
+                r1_header(31 downto 0)  := r1_status;
+                r1_crc := crc7_any(r1_header);
+
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := std_logic_vector(cmd_index);
+                resp48(39 downto 8)  := r1_status;
+                resp48(7 downto 1)   := r1_crc;
+                resp48(0)            := '1';
+
+                resp_shift              <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
+                cmd_oe_reg              <= '1';
+                cmd_out_reg             <= resp48(47);
+                resp_cnt                <= 46;
+                state                   <= RESP_TX;
+              elsif cmd_index = to_unsigned(25, 6) then
+                cmd25_seen_reg <= '1';
+
+                r1_status := make_r1_status(selected_reg);
+                r1_header(39)           := '0';
+                r1_header(38)           := '0';
+                r1_header(37 downto 32) := std_logic_vector(cmd_index);
+                r1_header(31 downto 0)  := r1_status;
+                r1_crc := crc7_any(r1_header);
+
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := std_logic_vector(cmd_index);
+                resp48(39 downto 8)  := r1_status;
+                resp48(7 downto 1)   := r1_crc;
+                resp48(0)            := '1';
+
+                resp_shift              <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
+                cmd_oe_reg              <= '1';
+                cmd_out_reg             <= resp48(47);
+                resp_cnt                <= 46;
+                state                   <= RESP_TX;
+              elsif cmd_index = to_unsigned(18, 6) then
+                cmd18_seen_reg <= '1';
+
+                r1_status := make_r1_status(selected_reg);
+                r1_header(39)           := '0';
+                r1_header(38)           := '0';
+                r1_header(37 downto 32) := std_logic_vector(cmd_index);
+                r1_header(31 downto 0)  := r1_status;
+                r1_crc := crc7_any(r1_header);
+
+                resp48 := (others => '1');
+                resp48(47) := '0';
+                resp48(46) := '0';
+                resp48(45 downto 40) := std_logic_vector(cmd_index);
+                resp48(39 downto 8)  := r1_status;
+                resp48(7 downto 1)   := r1_crc;
+                resp48(0)            := '1';
+
+                resp_shift              <= (others => '1');
+                resp_shift(47 downto 0) <= resp48;
+                cmd_oe_reg              <= '1';
+                cmd_out_reg             <= resp48(47);
+                resp_cnt                <= 46;
+                state                   <= RESP_TX;
               elsif cmd_index = to_unsigned(7, 6) then
                 if cmd_arg(31 downto 16) = x"0000" then
                   selected_reg <= '0';
@@ -362,6 +454,11 @@ begin
   cmd_oe    <= cmd_oe_reg;
   cmd1_seen <= cmd1_seen_reg;
   cmd8_seen <= cmd8_seen_reg;
+  cmd23_seen <= cmd23_seen_reg;
+  cmd25_seen <= cmd25_seen_reg;
+  cmd18_seen <= cmd18_seen_reg;
+  cmd23_reliable <= cmd23_reliable_reg;
+  block_count <= block_count_reg;
   ext_csd_read_req <= ext_csd_read_req_reg;
   ext_csd_power_class <= ext_csd_power_class_reg;
   ext_csd_bus_width   <= ext_csd_bus_width_reg;
