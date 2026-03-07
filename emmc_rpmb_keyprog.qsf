@@ -7,6 +7,7 @@ set_global_assignment -name TOP_LEVEL_ENTITY emmc_slave_top
 
 # Source files
 set_global_assignment -name VHDL_FILE crc_modules.vhd
+set_global_assignment -name VHDL_FILE cmd1_responder.vhd
 set_global_assignment -name VHDL_FILE cmd_decoder.vhd
 set_global_assignment -name VHDL_FILE rpmb_logic.vhd
 set_global_assignment -name VHDL_FILE led_status.vhd
