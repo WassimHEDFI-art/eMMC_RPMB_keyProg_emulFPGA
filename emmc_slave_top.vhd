@@ -80,9 +80,6 @@ architecture rtl of emmc_slave_top is
   signal rpmb_req_type_last  : std_logic_vector(15 downto 0);
   signal write_xfer_done     : std_logic := '0';
   signal read_xfer_done      : std_logic := '0';
-  signal rpmb_prog_req_seen_latched   : std_logic := '0';
-  signal rpmb_result_req_seen_latched : std_logic := '0';
-  signal rpmb_result_tx_done_latched  : std_logic := '0';
 begin
   cmd_in <= emmc_cmd;
   dat0_in <= emmc_dat0;
@@ -199,9 +196,6 @@ begin
         rpmb_byte_in      <= (others => '0');
         rpmb_frame_done   <= '0';
         rpmb_consume_result <= '0';
-        rpmb_prog_req_seen_latched <= '0';
-        rpmb_result_req_seen_latched <= '0';
-        rpmb_result_tx_done_latched <= '0';
       else
         rpmb_byte_valid <= '0';
         rpmb_frame_done <= '0';
@@ -226,15 +220,6 @@ begin
         end if;
         if cmd18_seen = '1' then
           cmd18_pending <= '1';
-        end if;
-        if (rpmb_frame_done = '1') and (rpmb_req_type_last = x"0001") then
-          rpmb_prog_req_seen_latched <= '1';
-        end if;
-        if (rpmb_frame_done = '1') and (rpmb_req_type_last = x"0005") then
-          rpmb_result_req_seen_latched <= '1';
-        end if;
-        if read_xfer_done = '1' then
-          rpmb_result_tx_done_latched <= '1';
         end if;
 
         case dat_state is
@@ -399,11 +384,7 @@ begin
 
   dat_tx_active <= '1' when (dat_state = TX_WAIT) or (dat_state = TX_START) or (dat_state = TX_DATA) or (dat_state = TX_CRC) or (dat_state = TX_END) else '0';
 
-  ledr <= '0'
-    & rpmb_result_ready
-    & rpmb_result_tx_done_latched
-    & rpmb_result_req_seen_latched
-    & rpmb_prog_req_seen_latched
+  ledr <= (9 downto 5 => '0')
     & rpmb_key_programmed
     & dat_tx_active
     & ext_csd_req_latched
