@@ -22,8 +22,9 @@ entity emmc_slave_top is
 end entity;
 
 architecture rtl of emmc_slave_top is
-  type dat_state_t is (IDLE, TX_WAIT, TX_START, TX_DATA, TX_CRC, TX_END, RX_WAIT, RX_DATA, RX_CRC, RX_END, RX_BUSY, RX_BUSY_END);
+  type dat_state_t is (IDLE, TX_WAIT, TX_START, TX_DATA, TX_CRC, TX_END, RX_WAIT, RX_DATA, RX_CRC, RX_END, RX_ACK, RX_BUSY, RX_BUSY_END);
   type tx_kind_t is (TX_NONE, TX_EXT_CSD, TX_RPMB);
+  constant C_WRITE_ACK_TOKEN : std_logic_vector(4 downto 0) := "00101";
 
   signal reset_50            : std_logic := '1';
   signal reset_cnt           : unsigned(5 downto 0) := (others => '0');
@@ -66,6 +67,7 @@ architecture rtl of emmc_slave_top is
   signal rx_subbit_count     : integer range 0 to 7 := 0;
   signal rx_byte_shift       : std_logic_vector(7 downto 0) := (others => '0');
   signal wait_count          : integer range 0 to 31 := 0;
+  signal ack_count           : integer range 0 to 4 := 0;
   signal busy_count          : integer range 0 to 63 := 0;
 
   signal rpmb_frame_active   : std_logic;
@@ -193,6 +195,7 @@ begin
         rx_subbit_count   <= 0;
         rx_byte_shift     <= (others => '0');
         wait_count        <= 0;
+        ack_count         <= 0;
         busy_count        <= 0;
         rpmb_byte_valid   <= '0';
         rpmb_byte_in      <= (others => '0');
@@ -267,6 +270,7 @@ begin
               rx_crc_count    <= 0;
               rx_subbit_count <= 0;
               rx_byte_shift   <= (others => '0');
+              ack_count       <= 0;
               busy_count      <= 0;
               dat_state       <= RX_WAIT;
             elsif (cmd18_pending = '1') and (block_count = x"0001") and (rpmb_result_ready = '1') and (cmd_oe = '0') then
@@ -378,8 +382,18 @@ begin
             dat0_oe  <= '0';
             dat0_out <= '1';
             rpmb_frame_done <= '1';
-            busy_count <= 0;
-            dat_state <= RX_BUSY;
+            ack_count <= 0;
+            dat_state <= RX_ACK;
+
+          when RX_ACK =>
+            dat0_oe  <= '1';
+            dat0_out <= C_WRITE_ACK_TOKEN(4 - ack_count);
+            if ack_count = 4 then
+              busy_count <= 0;
+              dat_state <= RX_BUSY;
+            else
+              ack_count <= ack_count + 1;
+            end if;
 
           when RX_BUSY =>
             dat0_oe  <= '1';
