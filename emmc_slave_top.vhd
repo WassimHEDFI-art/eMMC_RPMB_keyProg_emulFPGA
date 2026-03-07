@@ -399,7 +399,8 @@ begin
 
   dat_tx_active <= '1' when (dat_state = TX_WAIT) or (dat_state = TX_START) or (dat_state = TX_DATA) or (dat_state = TX_CRC) or (dat_state = TX_END) else '0';
 
-  ledr <= rpmb_result_ready
+  ledr <= '0'
+    & rpmb_result_ready
     & rpmb_result_tx_done_latched
     & rpmb_result_req_seen_latched
     & rpmb_prog_req_seen_latched
