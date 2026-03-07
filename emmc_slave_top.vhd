@@ -83,6 +83,7 @@ architecture rtl of emmc_slave_top is
   signal rpmb_req_type_last  : std_logic_vector(15 downto 0);
   signal write_xfer_done     : std_logic := '0';
   signal read_xfer_done      : std_logic := '0';
+  signal second_write_start_latched : std_logic := '0';
 begin
   cmd_in <= emmc_cmd;
   dat0_in <= emmc_dat0;
@@ -201,6 +202,7 @@ begin
         rpmb_byte_in      <= (others => '0');
         rpmb_frame_done   <= '0';
         rpmb_consume_result <= '0';
+        second_write_start_latched <= '0';
       else
         rpmb_byte_valid <= '0';
         rpmb_frame_done <= '0';
@@ -343,6 +345,9 @@ begin
               rx_bit_count    <= 0;
               rx_subbit_count <= 0;
               rx_byte_shift   <= (others => '0');
+              if rpmb_key_programmed = '1' then
+                second_write_start_latched <= '1';
+              end if;
               dat_state       <= RX_DATA;
             end if;
 
@@ -423,7 +428,8 @@ begin
 
   dat_tx_active <= '1' when (dat_state = TX_WAIT) or (dat_state = TX_START) or (dat_state = TX_DATA) or (dat_state = TX_CRC) or (dat_state = TX_END) else '0';
 
-  ledr <= (9 downto 5 => '0')
+  ledr <= (9 downto 6 => '0')
+    & second_write_start_latched
     & rpmb_key_programmed
     & dat_tx_active
     & ext_csd_req_latched
