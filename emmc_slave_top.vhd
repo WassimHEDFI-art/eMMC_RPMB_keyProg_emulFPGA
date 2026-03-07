@@ -84,9 +84,6 @@ architecture rtl of emmc_slave_top is
   signal write_xfer_done     : std_logic := '0';
   signal read_xfer_done      : std_logic := '0';
   signal second_write_start_latched : std_logic := '0';
-  signal second_write_data_done_latched : std_logic := '0';
-  signal second_write_frame_done_latched : std_logic := '0';
-  signal second_write_ack_latched : std_logic := '0';
 begin
   cmd_in <= emmc_cmd;
   dat0_in <= emmc_dat0;
@@ -206,9 +203,6 @@ begin
         rpmb_frame_done   <= '0';
         rpmb_consume_result <= '0';
         second_write_start_latched <= '0';
-        second_write_data_done_latched <= '0';
-        second_write_frame_done_latched <= '0';
-        second_write_ack_latched <= '0';
       else
         rpmb_byte_valid <= '0';
         rpmb_frame_done <= '0';
@@ -374,9 +368,6 @@ begin
             end if;
 
             if rx_bit_count = 4095 then
-              if rpmb_key_programmed = '1' then
-                second_write_data_done_latched <= '1';
-              end if;
               rx_crc_count <= 0;
               dat_state    <= RX_CRC;
             else
@@ -396,9 +387,6 @@ begin
             dat0_oe  <= '0';
             dat0_out <= '1';
             rpmb_frame_done <= '1';
-            if rpmb_key_programmed = '1' then
-              second_write_frame_done_latched <= '1';
-            end if;
             dat_state <= RX_STOP;
 
           when RX_STOP =>
@@ -413,9 +401,6 @@ begin
             dat0_oe  <= '1';
             dat0_out <= C_WRITE_ACK_TOKEN(4 - ack_count);
             if ack_count = 4 then
-              if rpmb_key_programmed = '1' then
-                second_write_ack_latched <= '1';
-              end if;
               write_xfer_done <= '1';
               dat_state <= IDLE;
             else
@@ -443,10 +428,7 @@ begin
 
   dat_tx_active <= '1' when (dat_state = TX_WAIT) or (dat_state = TX_START) or (dat_state = TX_DATA) or (dat_state = TX_CRC) or (dat_state = TX_END) else '0';
 
-  ledr <= '0'
-    & second_write_ack_latched
-    & second_write_frame_done_latched
-    & second_write_data_done_latched
+  ledr <= (9 downto 6 => '0')
     & second_write_start_latched
     & rpmb_key_programmed
     & dat_tx_active
