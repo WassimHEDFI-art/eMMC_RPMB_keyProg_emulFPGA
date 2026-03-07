@@ -68,7 +68,7 @@ architecture rtl of emmc_slave_top is
   signal rx_byte_shift       : std_logic_vector(7 downto 0) := (others => '0');
   signal wait_count          : integer range 0 to 31 := 0;
   signal ack_count           : integer range 0 to 4 := 0;
-  signal busy_count          : integer range 0 to 63 := 0;
+  signal busy_count          : integer range 0 to 255 := 0;
 
   signal rpmb_frame_active   : std_logic;
   signal rpmb_byte_valid     : std_logic := '0';
@@ -343,7 +343,7 @@ begin
           when RX_PREWAIT =>
             dat0_oe  <= '1';
             dat0_out <= '0';
-            if busy_count = 15 then
+            if busy_count = 127 then
               dat0_oe <= '0';
               dat0_out <= '1';
               dat_state <= RX_WAIT;
