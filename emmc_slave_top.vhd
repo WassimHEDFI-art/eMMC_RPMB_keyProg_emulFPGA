@@ -22,7 +22,7 @@ entity emmc_slave_top is
 end entity;
 
 architecture rtl of emmc_slave_top is
-  type dat_state_t is (IDLE, TX_WAIT, TX_START, TX_DATA, TX_CRC, TX_END, RX_PREWAIT, RX_WAIT, RX_DATA, RX_CRC, RX_END, RX_STOP, RX_ACK, RX_BUSY, RX_BUSY_END);
+  type dat_state_t is (IDLE, TX_WAIT, TX_START, TX_DATA, TX_CRC, TX_END, RX_WAIT, RX_DATA, RX_CRC, RX_END, RX_STOP, RX_ACK, RX_BUSY, RX_BUSY_END);
   type tx_kind_t is (TX_NONE, TX_EXT_CSD, TX_RPMB);
   constant C_WRITE_ACK_TOKEN : std_logic_vector(4 downto 0) := "00101";
 
@@ -272,11 +272,7 @@ begin
               rx_byte_shift   <= (others => '0');
               ack_count       <= 0;
               busy_count      <= 0;
-              if (rpmb_key_programmed = '1') and (rpmb_result_ready = '1') then
-                dat_state <= RX_PREWAIT;
-              else
-                dat_state <= RX_WAIT;
-              end if;
+              dat_state       <= RX_WAIT;
             elsif (cmd18_pending = '1') and (block_count = x"0001") and (rpmb_result_ready = '1') and (cmd_oe = '0') then
               v_frame := (others => '0');
               v_frame((511 - 508) * 8 + 7 downto (511 - 508) * 8) := rpmb_result_code(15 downto 8);
@@ -340,17 +336,6 @@ begin
             tx_kind   <= TX_NONE;
             dat_state <= IDLE;
 
-          when RX_PREWAIT =>
-            dat0_oe  <= '1';
-            dat0_out <= '0';
-            if busy_count = 127 then
-              dat0_oe <= '0';
-              dat0_out <= '1';
-              dat_state <= RX_WAIT;
-            else
-              busy_count <= busy_count + 1;
-            end if;
-
           when RX_WAIT =>
             dat0_oe  <= '0';
             dat0_out <= '1';
@@ -411,8 +396,6 @@ begin
             dat0_oe  <= '1';
             dat0_out <= C_WRITE_ACK_TOKEN(4 - ack_count);
             if ack_count = 4 then
-              dat0_oe <= '0';
-              dat0_out <= '1';
               write_xfer_done <= '1';
               dat_state <= IDLE;
             else
